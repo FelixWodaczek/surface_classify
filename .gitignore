@@ -130,5 +130,6 @@ dmypy.json
 
 # Data Files
 *.extxyz
+!/src/localstructures/*.extxyz
 *.lammpstrj
 *.npy
