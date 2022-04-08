@@ -1,8 +1,8 @@
 import os
 import pathlib
-from re import S
 import numpy as np
 import json
+import matplotlib.pyplot as plt
 
 from ase.io import write as ase_write
 from ase.io import read as ase_read
@@ -11,12 +11,17 @@ from ase.neighborlist import natural_cutoffs, NeighborList
 from dscribe.descriptors import SOAP
 from dscribe.kernels import AverageKernel as ds_AverageKernel
 from sklearn.metrics.pairwise import rbf_kernel
-from pyparsing import autoname_elements
 
 STANDARD_LOCAL_STRUCTURES_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)),"src/localstructures/")
 
 class NeighbourClassifier():
-    def __init__(self, local_structures_path=None):
+    def __init__(self, local_structures_path=None, first_class=3, last_class=9, non_class_max=14):
+        self.class_low = first_class - 1
+        self.class_high = last_class + 1
+        self.low_list = [ii for ii in range(0, self.class_low + 1)]
+        self.high_list = [ii for ii in range(self.class_high, non_class_max+1)]
+        self.non_class_list = self.low_list + self.high_list
+
         self.local_structures_path = None
         self.identification_list = []
         self.identification_dict = {}
@@ -31,7 +36,8 @@ class NeighbourClassifier():
             self.local_structures_path = STANDARD_LOCAL_STRUCTURES_PATH
         else:
             self.local_structures_path = local_structures_path
-        
+    
+    def load_identifiers(self, rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05):
         with open(os.path.join(self.local_structures_path, "identifiers.json"), "r") as f:
             json_dict = json.load(f)
             f.close()
@@ -41,7 +47,7 @@ class NeighbourClassifier():
         for ii_struct in range(15):
             self.identification_dict[str(ii_struct)] = {"soap_descr": [], "id_num": [], "id": []}
 
-        self.soap = SOAP(species=["Rh", "Cu"], rcut=3.5, nmax=12, lmax=12, sigma=0.1, periodic=False)
+        self.soap = SOAP(species=["Rh", "Cu"], rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
         self.rh_cu_loc = self.soap.get_location(("Cu", "Rh"))
 
         soap_descriptors = []
@@ -64,7 +70,7 @@ class NeighbourClassifier():
             n_atoms = struct_file_name[0]
 
             self.identification_dict[n_atoms]["soap_descr"].append(cur_soap)
-            self.identification_dict[n_atoms]["id_num"].append(ii_sf + 8)
+            self.identification_dict[n_atoms]["id_num"].append(ii_sf + len(self.non_class_list))
             self.identification_dict[n_atoms]["id"].append(self.identification_list[ii_sf])
 
         for key, value in self.identification_dict.items():
@@ -73,38 +79,51 @@ class NeighbourClassifier():
             else:
                 self.identification_dict[key]["soap_descr"] = np.asarray(self.identification_dict[key]["soap_descr"])
 
-        self.n_classes = 3 + len(self.identification_list) + 5 # 0, 1, 2, 10, 11, 12, 13, 14, list, 
+        self.n_classes = len(self.low_list) + len(self.identification_list) + len(self.high_list) # 0, 1, 2, 10, 11, 12, 13, 14, list, 
 
         self.soap_descriptors = np.asarray(soap_descriptors) # TODO: remove
         # self.kernel = rbf_kernel # TODO: replaces dscribe kernel, seems simpler
-        self.kernel = ds_AverageKernel(metric="rbf", gamma=0.05)
+        self.kernel = ds_AverageKernel(metric="rbf", gamma=gamma_kernel)
         # self.kernel = ak.create(self.soap_descriptors) # TODO: see how similar they are to one another
 
-    def classify(self, atom):
-        neighbour_len = len(atom) - 1
-        if neighbour_len < 3:
-            return neighbour_len, neighbour_len
-        elif neighbour_len > 9:
-            return neighbour_len, neighbour_len - 7
-        else:
-            at_symbs = atom.get_chemical_symbols()
-            at_pos = self._get_positions(at_symbs)
-            if not len(at_pos) == 1:
-                raise ImportError("More than one Rh Atom in atom")
-            else:
-                at_pos = at_pos[0]
+    def classify(self, atom, mode='pre_group', n_neigh_by_class=True):
+        if mode == 'pre_group' or 'class_all':
 
+            neighbour_len = len(atom) - 1
+            if neighbour_len <= self.class_low:
+                return neighbour_len, neighbour_len
+            elif neighbour_len >= self.class_high:
+                return neighbour_len, neighbour_len - (self.class_high - len(self.low_list))
+            else:
+                at_symbs = atom.get_chemical_symbols()
+                at_pos = self._get_positions(at_symbs)
+                if not len(at_pos) == 1:
+                    raise ImportError("More than one Rh Atom in atom")
+                else:
+                    at_pos = at_pos[0]
+                
             soap_atom = self.soap.create(atom)[at_pos, :][np.newaxis, np.newaxis, ...]
-            soap_base = self.identification_dict[str(neighbour_len)]["soap_descr"]
-            soap_base = self.soap_descriptors
-            assert soap_atom.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atom.shape[0], soap_base[0].shape[0])
-            similarities = self.kernel.create(soap_base, soap_atom)
+
+            if mode == 'pre_group':
+                soap_base = self.identification_dict[str(neighbour_len)]["soap_descr"]
+                assert soap_atom.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atom.shape[0], soap_base[0].shape[0])
+                
+                similarities = self.kernel.create(soap_base, soap_atom)
+                soap_class = np.argmax(similarities, axis=0)
+
+                return neighbour_len, self.identification_dict[str(neighbour_len)]["id_num"][int(soap_class)]
             
-            soap_class = np.argmax(similarities, axis=0)
-            # print(neighbour_len, similarities)
-            # print(self.identification_dict[str(neighbour_len)]["id"][int(soap_class)])
-            return neighbour_len, soap_class[0] + 8
-            return neighbour_len, self.identification_dict[str(neighbour_len)]["id_num"][int(soap_class)]
+            elif mode == 'class_all':
+                soap_base = self.soap_descriptors
+
+                assert soap_atom.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atom.shape[0], soap_base[0].shape[0])
+                similarities = self.kernel.create(soap_base, soap_atom)
+                
+                soap_class = np.argmax(similarities, axis=0)
+                if n_neigh_by_class:
+                    neighbour_len = self.id_to_cat(soap_class[0] + len(self.non_class_list))
+
+                return neighbour_len, soap_class[0] + len(self.non_class_list)
     
     @staticmethod
     def _get_positions(symbols, tar_symbol="Rh"):
@@ -115,29 +134,34 @@ class NeighbourClassifier():
         return positions
 
     def id_to_cat(self, id_num):
-        if id_num < 3:
+        if id_num < len(self.low_list):
             return str(id_num)
-        elif id_num < 8:
-            return str(id_num + 7)
+        elif id_num < len(self.non_class_list):
+            return str(id_num + (self.class_high - len(self.low_list)))
         else:
-            return self.identification_list[id_num - 8]
+            return self.identification_list[id_num - len(self.non_class_list)]
 
 
 class NeighbourSort():
-    def __init__(self, local_structures_path=None):
+    def __init__(
+        self, local_structures_path=None, first_class=3, last_class=9, non_class_max=14,
+        rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05
+    ):
         if local_structures_path is None:
             os.path.abspath(__file__)
             self.local_structures_path = STANDARD_LOCAL_STRUCTURES_PATH
         else:
             self.local_structures_path = local_structures_path
         
-        self.classifier = NeighbourClassifier(self.local_structures_path)
+        self.classifier = NeighbourClassifier(self.local_structures_path, first_class, last_class, non_class_max)
+        self.classifier.load_identifiers(rcut, nmax, lmax, sigma, gamma_kernel)
+
         self.cat_counter = None
         self.or_file = None
         self.work_dir_path = None
         self.timesteps = None
 
-    def init_folder_structure(self, file_path, n_head=9, n_tail=0, n_particles=1400, timesteps=100, out_dir=None):
+    def init_folder_structure(self, file_path, n_head=9, n_tail=0, n_atoms_in_part=1400, timesteps=100, out_dir=None):
         self.timesteps = timesteps
 
         self.or_file_path = os.path.abspath(file_path)
@@ -156,7 +180,7 @@ class NeighbourSort():
             f_lines = f.read().split('\n')
             f.close()
 
-        lines_per_part = n_head + n_tail + n_particles
+        lines_per_part = n_head + n_tail + n_atoms_in_part
 
         for step in range(timesteps):
             line_start = lines_per_part * step
@@ -164,9 +188,9 @@ class NeighbourSort():
 
             
             new_lines = f_lines[line_start:line_end]
-            particles = new_lines[n_head:n_head+n_particles]
+            particles = new_lines[n_head:n_head+n_atoms_in_part]
             particles.sort()
-            new_lines[n_head:n_head+n_particles] = particles
+            new_lines[n_head:n_head+n_atoms_in_part] = particles
             
             cur_dir = os.path.join(self.work_dir_path, "ts_%u/"%step)
             os.mkdir(cur_dir)
@@ -175,8 +199,30 @@ class NeighbourSort():
                 f.write('\n'.join(new_lines))
                 f.close()
 
+    def sort_cat_counter(self, cat_counter=None):
+        if cat_counter is None:
+            cat_counter = self.cat_counter
 
-    def create_local_structure(self, last_n=14, create_subfolders=True):
+        classes = []
+        particle_num = []
+        for ii_id in range(cat_counter.shape[-1]):
+            cat_string = self.classifier.id_to_cat(ii_id)
+            classes.append(cat_string)
+
+            num = int(cat_string.split('_', 1)[0])
+            particle_num.append(num)
+
+        sort_arr = np.argsort(np.asarray(particle_num))
+        sort_arr = np.asarray(sort_arr, np.int32)
+
+        sorted_classes = []
+        for sort_ind in sort_arr:
+            sorted_classes.append(classes[sort_ind])
+            
+        sorted_part_count = np.take(cat_counter, sort_arr, axis=1)
+        return sorted_classes, sorted_part_count
+
+    def create_local_structure(self, last_n=14, create_subfolders=True, mode="pre_group"):
         self.cat_counter = np.zeros(shape=(self.timesteps, self.classifier.n_classes), dtype=np.int32)
 
         for step in range(self.timesteps):
@@ -201,7 +247,7 @@ class NeighbourSort():
 
                     n_neighbours = len(neighbour_particle) - 1
                     
-                    n_neigh, class_id = self.classifier.classify(neighbour_particle)
+                    n_neigh, class_id = self.classifier.classify(neighbour_particle, mode=mode)
                     class_cat = self.classifier.id_to_cat(class_id)
                     self.cat_counter[step, class_id] += 1
                     
@@ -221,5 +267,71 @@ class NeighbourSort():
                         neighbour_particle.write(tar_path, format='extxyz')
         
         return self.cat_counter
-        # TODO: subfolder structure
-                    
+        
+    def sort_save_cat(self, file_name=None, cat_counter=None):
+        if file_name is None:
+            file_name = os.path.join(os.path.dirname(self.or_file_path), "part_count.txt")
+
+        if cat_counter is None:
+            cat_counter = self.cat_counter
+
+        sorted_classes, sorted_cat_counter = self.sort_cat_counter(cat_counter=cat_counter)
+        header = """Saved category counter for %s.
+        timestep 
+        """%self.work_dir_path
+        for sorted_class in sorted_classes:
+            header += """%s """%sorted_class
+        
+        print_cat = np.zeros((self.timesteps, self.classifier.n_classes+1), dtype=np.int32)
+        print_cat[:, 0] = np.arange(self.timesteps) + 1
+        print_cat[:, 1:] = sorted_cat_counter
+
+        np.savetxt(file_name, print_cat, header=header)
+        return file_name
+
+    def load_sort_cat(self, file_name):
+        with open(file_name, "r") as f:
+            sorted_cats = f.read().split('\n')[1].split(' ')[3:]
+            f.close()
+
+        cat_counter = np.loadtxt(file_name, dtype=np.int32)
+
+        return cat_counter[:, 1:], cat_counter[:, 0], sorted_cats
+
+    @staticmethod
+    def plot_dist(sorted_classes, sorted_cat_counter):
+        x_plot = np.arange(sorted_cat_counter.shape[-1])
+    
+        sort_total_count = np.sum(sorted_cat_counter, axis=0)
+        
+        sort_not_zero = sort_total_count != 0
+
+        fig, axis = plt.subplots(figsize=(12, 8))
+        axis.set_title('Categorized Surface Atoms over 100 Timesteps')
+        axis.bar(x_plot, height=sort_total_count)
+        axis.set_xticks(x_plot, sorted_classes, rotation=320)
+        axis.set_yscale('log')
+        axis.grid(axis='y')
+
+        fig2, axis2 = plt.subplots(figsize=(150, 7))
+        im = axis2.imshow(sorted_cat_counter.T[:, :], aspect='auto', cmap="viridis")
+        axis2.set_xlabel('timestamp')
+        axis2.set_ylabel('category')
+        axis2.set_yticks(x_plot, sorted_classes)
+        ax_cb = fig2.colorbar(im)
+        
+        not_zero_classes = []
+        for ii_nz, not_zero in enumerate(sort_not_zero):
+            if not_zero:
+                not_zero_classes.append(sorted_classes[ii_nz])
+        x_plot_not_zero = np.arange(len(not_zero_classes))
+        # print(len(not_zero_classes), x_plot_not_zero.shape)
+
+        fig3, axis3 = plt.subplots(figsize=(150, 7))
+        im = axis3.imshow(sorted_cat_counter.T[sort_not_zero, :], aspect='auto', cmap="viridis")
+        axis3.set_xlabel('timestamp')
+        axis3.set_ylabel('category')
+        axis3.set_yticks(x_plot_not_zero, not_zero_classes)
+        ax_cb = fig3.colorbar(im)
+        
+        plt.show()
