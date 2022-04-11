@@ -1,4 +1,5 @@
 import os
+import sys
 import pathlib
 import numpy as np
 import json
@@ -48,7 +49,6 @@ class NeighbourClassifier():
             self.identification_dict[str(ii_struct)] = {"soap_descr": [], "id_num": [], "id": []}
 
         self.soap = SOAP(species=["Rh", "Cu"], rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
-        self.rh_cu_loc = self.soap.get_location(("Cu", "Rh"))
 
         soap_descriptors = []
         struct_file_names = []
@@ -60,11 +60,13 @@ class NeighbourClassifier():
             at_symbs = struct_atoms.get_chemical_symbols()
             at_pos = self._get_positions(at_symbs)
             if not len(at_pos) == 1:
+                print(struct_atoms)
+                print(at_pos)
                 raise ImportError("More than one Rh Atom in input file %s"%struct_file)
             else:
                 at_pos = at_pos[0]
-            cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...]
-            soap_descriptors.append(cur_soap) # TODO: remove
+            cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...] # TODO: Implement a way to control how many SOAPs are used.
+            soap_descriptors.append(cur_soap) 
 
             struct_file_name = str(os.path.basename(struct_file))
             n_atoms = struct_file_name[0]
@@ -98,6 +100,8 @@ class NeighbourClassifier():
                 at_symbs = atom.get_chemical_symbols()
                 at_pos = self._get_positions(at_symbs)
                 if not len(at_pos) == 1:
+                    print(atom)
+                    print(at_pos)
                     raise ImportError("More than one Rh Atom in atom")
                 else:
                     at_pos = at_pos[0]
@@ -185,11 +189,10 @@ class NeighbourSort():
         for step in range(timesteps):
             line_start = lines_per_part * step
             line_end = lines_per_part * (step + 1)
-
             
             new_lines = f_lines[line_start:line_end]
             particles = new_lines[n_head:n_head+n_atoms_in_part]
-            particles.sort()
+            particles.sort() # TODO: Somehow keep track of particles?
             new_lines[n_head:n_head+n_atoms_in_part] = particles
             
             cur_dir = os.path.join(self.work_dir_path, "ts_%u/"%step)
@@ -225,7 +228,7 @@ class NeighbourSort():
     def create_local_structure(self, last_n=14, create_subfolders=True, mode="pre_group"):
         self.cat_counter = np.zeros(shape=(self.timesteps, self.classifier.n_classes), dtype=np.int32)
 
-        for step in range(self.timesteps):
+        for step in self.progressbar(range(self.timesteps), "At Timestep:", size=40):
 
             cur_dir = pathlib.Path(os.path.join(self.work_dir_path, "ts_%u/"%step))
             files = list(cur_dir.glob("*.lammpstrj"))
@@ -276,27 +279,41 @@ class NeighbourSort():
             cat_counter = self.cat_counter
 
         sorted_classes, sorted_cat_counter = self.sort_cat_counter(cat_counter=cat_counter)
-        header = """Saved category counter for %s.
-        timestep 
-        """%self.work_dir_path
+        header = "Saved category counter for %s.\ntimestep "%self.work_dir_path
         for sorted_class in sorted_classes:
-            header += """%s """%sorted_class
+            header += "%s "%sorted_class
         
         print_cat = np.zeros((self.timesteps, self.classifier.n_classes+1), dtype=np.int32)
-        print_cat[:, 0] = np.arange(self.timesteps) + 1
+        print_cat[:, 0] = np.arange(self.timesteps)
         print_cat[:, 1:] = sorted_cat_counter
 
-        np.savetxt(file_name, print_cat, header=header)
+        np.savetxt(file_name, print_cat, header=header, fmt='%u')
         return file_name
 
     def load_sort_cat(self, file_name):
         with open(file_name, "r") as f:
-            sorted_cats = f.read().split('\n')[1].split(' ')[3:]
+            cat_line = f.read().split('\n')[1]
+            cat_line = cat_line.split(' ')
+            sorted_cats = cat_line[2:-1] # Cut off hash symbol, timesteps label and final whitespace
             f.close()
 
         cat_counter = np.loadtxt(file_name, dtype=np.int32)
 
         return cat_counter[:, 1:], cat_counter[:, 0], sorted_cats
+
+    @staticmethod
+    def progressbar(it, prefix="", size=60, file=sys.stdout):
+        count = len(it)
+        def show(j):
+            x = int(size*j/count)
+            file.write("%s[%s%s] %i/%i\r" % (prefix, "#"*x, "."*(size-x), j, count))
+            file.flush()        
+        show(0)
+        for i, item in enumerate(it):
+            yield item
+            show(i+1)
+        file.write("\n")
+        file.flush()
 
     @staticmethod
     def plot_dist(sorted_classes, sorted_cat_counter):
@@ -313,7 +330,7 @@ class NeighbourSort():
         axis.set_yscale('log')
         axis.grid(axis='y')
 
-        fig2, axis2 = plt.subplots(figsize=(150, 7))
+        fig2, axis2 = plt.subplots(figsize=(20, 7))
         im = axis2.imshow(sorted_cat_counter.T[:, :], aspect='auto', cmap="viridis")
         axis2.set_xlabel('timestamp')
         axis2.set_ylabel('category')
@@ -327,7 +344,7 @@ class NeighbourSort():
         x_plot_not_zero = np.arange(len(not_zero_classes))
         # print(len(not_zero_classes), x_plot_not_zero.shape)
 
-        fig3, axis3 = plt.subplots(figsize=(150, 7))
+        fig3, axis3 = plt.subplots(figsize=(20, 7))
         im = axis3.imshow(sorted_cat_counter.T[sort_not_zero, :], aspect='auto', cmap="viridis")
         axis3.set_xlabel('timestamp')
         axis3.set_ylabel('category')

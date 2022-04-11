@@ -27,11 +27,11 @@ class SNParser:
             The program returns the state of all 'Rh' atoms for each timestep in a matrix as a .txt file."""
         )
         self.neighbour_sort = None
+        self.pars_args = None
 
     def init_parser(self):
         self.parser.add_argument(
-            "func",
-            dest="func",
+            dest="func", type=str,
             help="""Subfunction of sort_neighbour.py to call.
             Available Functions:
             sort_cat - Sorts Nanoparticle in file according to provided arguments.
@@ -39,23 +39,22 @@ class SNParser:
             """
         )
         self.parser.add_argument(
-            "file",
-            dest="file",
+            dest="file", type=str, 
             help="Name of file containing nanoparticle."
         )
         self.parser.add_argument(
             "--timesteps",
-            dest="n_ts", default=100,
+            dest="n_ts", default=100, type=int,
             help="Number of timesteps for nanoparticle. Defaults to 100."
         )
         self.parser.add_argument(
             "--num_atoms",
-            dest="n_ats", default=1400,
+            dest="n_ats", default=1400, type=int,
             help="Number of atoms in nanoparticle. Defaults to 1400"
         )
         self.parser.add_argument(
             "--last_n",
-            dest="last_n", default=14,
+            dest="last_n", default=14, type=int, 
             help="The last n atoms in the nanoparticles to analyze using sort_neigh."
         )
         self.parser.add_argument(
@@ -72,28 +71,28 @@ class SNParser:
         )
         self.parser.add_argument(
             "--r_cut",
-            dest="rcut", default=3.1,
-            help="rcut in SOAP. Defaults to 12."
+            dest="rcut", default=3.1, type=float,
+            help="rcut in SOAP. Defaults to 3.1."
         )
         self.parser.add_argument(
             "--n_max",
-            dest="nmax", default=12,
+            dest="nmax", default=12, type=int,
             help="nmax in SOAP. Defaults to 12."
         )
         self.parser.add_argument(
             "--l_max",
-            dest="lmax", default=12,
+            dest="lmax", default=12, type=int,
             help="lmax in SOAP. Defaults to 12."
         )
         self.parser.add_argument(
             "--sigma",
-            dest="sigma", default=0.5,
-            help="lmax in SOAP. Defaults to 12."
+            dest="sigma", default=0.5, type=float,
+            help="lmax in SOAP. Defaults to 0.5."
         )
         self.parser.add_argument(
             "--gamma_kernel",
-            dest="gamma_kernel", default=0.05,
-            help="gamma_kernel in dscribe AverageKernel. Defaults to 12."
+            dest="gamma_kernel", default=0.05, type=float,
+            help="gamma_kernel in dscribe AverageKernel. Defaults to 0.05."
         )
         self.parser.add_argument(
             "--create_subfolders",
@@ -104,53 +103,66 @@ class SNParser:
         )
         self.parser.add_argument(
             "--classify_mode",
-            dest="classify_mode", default="pre_group",
+            dest="classify_mode", default="pre_group", type=str, 
             help="""Mode by which to classify the surface.
             Available modes: "pre_group", "class_all".
             "pre_group" only compares to atoms that match number of nearest neighbours.
             "class_all" compares to the full kernel and returns neighbour numbers and classes according to closest category.
             Defaults to pre_group."""
         )
+
+    def read_args(self):
+        self.pars_args = self.parser.parse_args()
+
+        if self.pars_args.out_file is not None:
+            self.pars_args.out_file = str(self.pars_args.out_file)
+
+        if self.pars_args.out_dir is not None:
+            self.pars_args.out_dir = str(self.pars_args.out_dir)
     
     def init_neighbour_sort(self):
         self.neighbour_sort = sn.NeighbourSort(
-        rcut=float(self.parser.rcut), nmax=int(self.parser.nmax), lmax=int(self.parser.lmax),
-        sigma=float(self.parser.sigma), gamma_kernel=float(self.parser.gamma_kernel)
+        rcut=self.pars_args.rcut, nmax=self.pars_args.nmax, lmax=self.pars_args.lmax,
+        sigma=self.pars_args.sigma, gamma_kernel=self.pars_args.gamma_kernel
         )
 
     def sort_cat(self):
         start = time.time()
         self.neighbour_sort.init_folder_structure(
-            str(self.parser.file), n_atoms_in_part=int(self.parser.n_ats),
-            timesteps=int(self.parser.n_ts), out_dir=self.parser.out_dir
+            self.pars_args.file, n_atoms_in_part=self.pars_args.n_ats,
+            timesteps=int(self.pars_args.n_ts), out_dir=self.pars_args.out_dir
         )
         cat_counter = self.neighbour_sort.create_local_structure(
-            last_n=int(self.parser.last_n), create_subfolders=bool(self.parser.create_subfolders),
-            mode=str(self.parser.classify_mode)
+            last_n=self.pars_args.last_n, create_subfolders=self.pars_args.create_subfolders,
+            mode=self.pars_args.classify_mode
         )
         stop = time.time()
         print("Sorting took %u seconds."%(stop-start))
         file_name = self.neighbour_sort.sort_save_cat(
-            file_name = self.parser.out_file, cat_counter=cat_counter
+            file_name = self.pars_args.out_file, cat_counter=cat_counter
         )
-        print("Saved output to %s."%file_name)
+        print("Saved output to '%s'."%file_name)
 
     def plot_result(self):
-        sorted_cat_counter, timesteps, sorted_classes = self.neighbour_sort.load_sort_cat(file_name=str(self.parser.file))
+        sorted_cat_counter, timesteps, sorted_classes = self.neighbour_sort.load_sort_cat(file_name=self.pars_args.file)
         self.neighbour_sort.plot_dist(sorted_classes, sorted_cat_counter)
         
 
 def main():
     snp = SNParser()
     snp.init_parser()
-    snp.parser.read_args()
+    snp.read_args()
+    
     snp.init_neighbour_sort()
 
-    if snp.parser.func_name == "sort_cat":
+    if str(snp.pars_args.func) == "sort_cat":
         snp.sort_cat()
 
-    elif snp.parser.func_name == "plot_result":
+    elif str(snp.pars_args.func) == "plot_result":
         snp.plot_result()
+
+    else:
+        raise ValueError("Function %s not implemented. See --help for available functions in sort_neigh_terminal."%str(snp.pars_args.func))
 
     
 if __name__ == '__main__':
