@@ -326,7 +326,7 @@ class NeighbourSort():
         fig, axis = plt.subplots(figsize=(12, 8))
         axis.set_title('Categorized Surface Atoms over 100 Timesteps')
         axis.bar(x_plot, height=sort_total_count)
-        axis.set_xticks(x_plot, sorted_classes, rotation=320)
+        axis.set_xticks(x_plot, sorted_classes, rotation=320, ha='left')
         axis.set_yscale('log')
         axis.grid(axis='y')
 
