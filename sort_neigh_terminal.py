@@ -1,6 +1,8 @@
 #!/usr/bin/env python3.9
 
 import sys
+from tkinter import NE
+from py_src.sort_neigh import NeighbourSort
 sys.path.append("py_src/")
 
 import sort_neigh as sn
@@ -36,6 +38,7 @@ class SNParser:
             Available Functions:
             sort_cat - Sorts Nanoparticle in file according to provided arguments.
             plot_result - Plot result originating from sort_cat in .txt file according to arguments.
+            remove_n_surf - Remove n particles from a given nanoparticle
             """
         )
         self.parser.add_argument(
@@ -110,6 +113,11 @@ class SNParser:
             "class_all" compares to the full kernel and returns neighbour numbers and classes according to closest category.
             Defaults to pre_group."""
         )
+        self.parser.add_argument(
+            "--n_remove",
+            dest="n_rem", default=64, type=int,
+            help="Number of atoms to remove from particle using remove_n_surf. Defaults to 64"
+        )
 
     def read_args(self):
         self.pars_args = self.parser.parse_args()
@@ -122,8 +130,8 @@ class SNParser:
     
     def init_neighbour_sort(self):
         self.neighbour_sort = sn.NeighbourSort(
-        rcut=self.pars_args.rcut, nmax=self.pars_args.nmax, lmax=self.pars_args.lmax,
-        sigma=self.pars_args.sigma, gamma_kernel=self.pars_args.gamma_kernel
+            rcut=self.pars_args.rcut, nmax=self.pars_args.nmax, lmax=self.pars_args.lmax,
+            sigma=self.pars_args.sigma, gamma_kernel=self.pars_args.gamma_kernel
         )
 
     def sort_cat(self):
@@ -147,6 +155,9 @@ class SNParser:
         sorted_cat_counter, timesteps, sorted_classes = self.neighbour_sort.load_sort_cat(file_name=self.pars_args.file)
         self.neighbour_sort.plot_dist(sorted_classes, sorted_cat_counter)
         
+    def remove_n_surf(self):
+        file_name = self.neighbour_sort.remove_n_surf(self.pars_args.file, self.pars_args.n_rem, self.pars_args.out_file)
+        print("Saved output to '%s'."%file_name)
 
 def main():
     snp = SNParser()
@@ -160,6 +171,9 @@ def main():
 
     elif str(snp.pars_args.func) == "plot_result":
         snp.plot_result()
+
+    elif str(snp.pars_args.func) == "remove_n_surf":
+        snp.remove_n_surf()
 
     else:
         raise ValueError("Function %s not implemented. See --help for available functions in sort_neigh_terminal."%str(snp.pars_args.func))

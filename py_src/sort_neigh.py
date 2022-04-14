@@ -2,6 +2,7 @@ import os
 import sys
 import pathlib
 import numpy as np
+from numpy.random import default_rng
 import json
 import matplotlib.pyplot as plt
 
@@ -270,6 +271,56 @@ class NeighbourSort():
                         neighbour_particle.write(tar_path, format='extxyz')
         
         return self.cat_counter
+
+    @staticmethod
+    def remove_n_surf(file_name, n_remove=64, out_file_name=None):
+        file_name = os.path.abspath(file_name)
+
+        if out_file_name is None:
+            out_file_name = file_name.split(".")
+            out_file_name[-2] = out_file_name[-2] + "_rem%u"%n_remove
+            out_file_name = ".".join(out_file_name)
+
+        out_format = file_name.split(".")[-1]
+        if out_format == "lammps-data":
+            original_particle = ase_read(file_name, format=out_format, style='atomic')
+        else:
+            original_particle = ase_read(file_name, format=out_format)
+
+        n_atoms = len(original_particle)
+
+        # set up neighbourlist
+        cut_off = natural_cutoffs(original_particle, mult=0.9)
+        neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=True)
+        neighbour_list.update(original_particle)
+
+        # Determine number of neighbours for each atom in nanoparticle
+        n_neighs = [] 
+        for nn_atom in range(n_atoms):
+            neighbour_indices, trash = neighbour_list.get_neighbors(nn_atom)
+            n_neighs.append(len(neighbour_indices))
+        n_neighs = np.asarray(n_neighs, dtype=np.int32)
+
+        is_surf = n_neighs <= 9
+        is_surf_inds = np.arange(n_atoms)[is_surf]
+        
+        n_surf = np.sum(np.asarray(is_surf, dtype=np.int32))
+        if n_surf < n_remove:
+            raise ValueError(
+                "Cannot remove %u surface atoms from particle with only %u atoms on surface"%(n_remove, n_surf)
+            )
+
+        # Figure out which indices to remove
+        rng = default_rng()
+        remove_inds = rng.choice(is_surf_inds, size=n_remove, replace=False)
+        remove_inds = np.sort(remove_inds)[::-1]
+
+        # Remove from back, but seems to not be necessary
+        out_particle = original_particle.copy()
+        del out_particle[remove_inds]
+
+        out_particle.write(out_file_name, format=out_format)
+        return out_file_name
         
     def sort_save_cat(self, file_name=None, cat_counter=None):
         if file_name is None:
