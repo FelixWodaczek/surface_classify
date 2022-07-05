@@ -129,8 +129,14 @@ dmypy.json
 .pyre/
 
 # Data Files
+*.pdf
+*.txt
+*.lammps-data
 *.extxyz
 !/src/localstructures/*.extxyz
 !/src/localstructures_onlyCu/*.extxyz
 *.lammpstrj
 *.npy
+
+#OOD items
+OOD/*

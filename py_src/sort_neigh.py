@@ -404,7 +404,7 @@ class NeighbourSort():
         file.flush()
 
     @staticmethod
-    def plot_dist(sorted_classes, sorted_cat_counter):
+    def plot_dist(sorted_classes, sorted_cat_counter, show_plot=True):
         x_plot = np.arange(sorted_cat_counter.shape[-1])
     
         sort_total_count = np.sum(sorted_cat_counter, axis=0)
@@ -412,7 +412,7 @@ class NeighbourSort():
         sort_not_zero = sort_total_count != 0
 
         fig, axis = plt.subplots(figsize=(12, 8))
-        axis.set_title('Categorized Surface Atoms over %u Timesteps'%(sorted_cat_counter.shape[-1]))
+        axis.set_title('Categorized Surface Atoms over %u Timesteps'%(sorted_cat_counter.shape[0]))
         axis.bar(x_plot, height=sort_total_count)
         axis.set_xticks(x_plot, sorted_classes, rotation=320, ha='left')
         axis.set_yscale('log')
@@ -439,4 +439,7 @@ class NeighbourSort():
         axis3.set_yticks(x_plot_not_zero, not_zero_classes)
         ax_cb = fig3.colorbar(im)
         
-        plt.show()
+        if show_plot:
+            plt.show()
+        else:
+            return [fig, fig2, fig3], [axis, axis2, axis3]
