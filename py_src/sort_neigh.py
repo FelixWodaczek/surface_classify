@@ -1,6 +1,7 @@
 import os
 import sys
 import pathlib
+from time import time
 from typing import ValuesView
 import numpy as np
 from numpy.random import default_rng
@@ -10,6 +11,7 @@ import matplotlib.pyplot as plt
 from ase.io import write as ase_write
 from ase.io import read as ase_read
 from ase.neighborlist import natural_cutoffs, NeighborList
+from ase.cell import Cell
 
 from dscribe.descriptors import SOAP
 from dscribe.kernels import AverageKernel as ds_AverageKernel
@@ -36,7 +38,6 @@ class NeighbourClassifier():
         self.soap_species = ["Rh", "Cu"]
         self.soap = None
         self.kernel = None
-        self.soap_descriptors = []
 
         if local_structures_path is None:
             self.local_structures_path = STANDARD_LOCAL_STRUCTURES_PATH
@@ -68,7 +69,7 @@ class NeighbourClassifier():
         struct_files = list(pathlib.Path(self.local_structures_path).glob("*.extxyz"))
         struct_files.sort()
         for ii_sf, struct_file in enumerate(struct_files):
-            cur_soap = self._soap_from_structfile(struct_file, ii_sf)
+            cur_soap = self._soap_from_structfile(struct_file, ii_sf, **kwargs)
             soap_descriptors.append(cur_soap) 
 
             struct_file_name = str(os.path.basename(struct_file))
@@ -86,7 +87,6 @@ class NeighbourClassifier():
 
         self.n_classes = len(self.low_list) + len(self.identification_list) + len(self.high_list) # 0, 1, 2, 10, 11, 12, 13, 14, list, 
 
-        self.soap_descriptors = np.asarray(soap_descriptors) # TODO: remove
         # self.kernel = rbf_kernel # TODO: replaces dscribe kernel, seems simpler
         self.kernel = ds_AverageKernel(metric="rbf", gamma=gamma_kernel)
         # self.kernel = ak.create(self.soap_descriptors) # TODO: see how similar they are to one another
@@ -136,17 +136,22 @@ class NeighbourClassifier():
         else:
             raise ValueError("Mode %s is unknown. Currently available modes: \n'pre_group'\n'class_all'")
     
-    def _soap_from_structfile(self, struct_file, ii_sf):
+    def _soap_from_structfile(self, struct_file, ii_sf, rescale_target=None, **kwargs):
         struct_atoms = ase_read(struct_file)
 
         at_symbs = struct_atoms.get_chemical_symbols()
         at_pos = self._target_locator(at_symbs)
+
+        if rescale_target is not None:
+            struct_atoms = self._rescale_atom_to_target(struct_atoms, rescale_target)
+
         if not len(at_pos) == 1:
             print(struct_atoms)
             print(at_pos)
             raise ImportError("More than one Rh Atom in input file %s"%struct_file)
         else:
             at_pos = at_pos[0]
+
         cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...] # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
@@ -157,6 +162,25 @@ class NeighbourClassifier():
             if symb == tar_symbol:
                 positions.append(ii_symb)
         return positions
+    
+    @staticmethod
+    def _rescale_atom_to_target(atoms, rescale_target):
+        if not isinstance(rescale_target, float):
+            raise TypeError("rescale_target must be of type 'float'!")
+
+        in_atoms = atoms.copy()
+
+        dists = in_atoms.get_all_distances()
+        min_old = np.min(dists[dists>0])
+        rescale_fact = rescale_target/min_old
+
+        scaled_pos = in_atoms.get_scaled_positions()
+        scaled_cell = Cell.new(in_atoms.get_cell().array*rescale_fact)
+        in_atoms.set_cell(scaled_cell)
+
+        in_atoms.set_scaled_positions(scaled_pos)
+
+        return in_atoms
 
     def id_to_cat(self, id_num):
         if id_num < len(self.low_list):
@@ -179,10 +203,14 @@ class onlyCuClassifier(NeighbourClassifier):
 
         self.soap_species = ["Cu"] # Overwrite this so there is no more Rh
 
-    def _soap_from_structfile(self, struct_file, ii_sf):
+    def _soap_from_structfile(self, struct_file, ii_sf, rescale_target=None, **kwargs):
         struct_atoms = ase_read(struct_file)
 
         at_pos = self.info_dict["center_pos"][ii_sf] # now the information about the center needs to be contained in info dict
+
+        if rescale_target is not None:
+            struct_atoms = self._rescale_atom_to_target(struct_atoms, rescale_target)
+
         cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...] # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
@@ -203,9 +231,23 @@ class NeighbourSort():
         self.work_dir_path = None
         self.timesteps = None
 
-    def init_folder_structure(self, file_path, n_head=9, n_tail=0, n_atoms_in_part=1400, timesteps=100, out_dir=None):
-        self.timesteps = timesteps
-
+    def init_folder_structure(self, file_path, n_head=9, n_tail=0, n_atoms_in_part=1400, timesteps=None, out_dir=None):
+        if timesteps is None:
+            n_lines = sum(1 for line in open(file_path, 'r'))
+            timesteps = n_lines/(n_atoms_in_part+n_head+n_tail)
+            if not float(timesteps).is_integer():
+                raise ValueError(
+                    "Number of lines in %s not fully divisible by n_atoms_in_part + n_head + n_tail (%u + %u + %u)"%(
+                        file_path, n_atoms_in_part, n_head, n_tail
+                    )
+                )
+            timesteps = int(timesteps)
+            self.timesteps = timesteps
+        else:
+            if not isinstance(timesteps, int):
+                raise ValueError("timesteps must be of type 'int'.")
+            self.timesteps = int(timesteps)
+        
         self.or_file_path = os.path.abspath(file_path)
         if out_dir is None:
             out_dir = os.path.join(os.path.dirname(self.or_file_path), "neigh_sort_out/")
