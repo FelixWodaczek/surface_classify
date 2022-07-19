@@ -133,6 +133,8 @@ dmypy.json
 *.txt
 *.lammps-data
 *.extxyz
+*.POSCAR
+*.zip
 !/src/localstructures/*.extxyz
 !/src/localstructures_onlyCu/*.extxyz
 *.lammpstrj
