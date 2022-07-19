@@ -235,26 +235,30 @@ class onlyCuClassifier(NeighbourClassifier):
 
 class USMLClassifier(BaseClassifier):
     def __init__(self, **kwargs):
-        super.__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.train_particle = None
         self.soaper = None
         self.dim_red = None
         self.clusterer = None
 
-    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, soap_species=["Rh, Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, **kwargs):
+        self.soap_species = []
+        
+
+    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, soap_species=["Rh", "Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, **kwargs):
+        self.soap_species = soap_species
         self.train_particle = particle.copy()
 
         self.soaper = SOAP(species=self.soap_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
         soaps = self.soaper.create(particle)
 
         if dim_red is None:
-            self.dim_red = PCA(**kwargs)
+            self.dim_red = PCA()
         else:
             self.dim_red = dim_red
 
         if clusterer is None:
-            self.clusterer = KMeans(**kwargs)
+            self.clusterer = KMeans()
         else:
             self.clusterer = clusterer
     
@@ -288,8 +292,13 @@ class USMLClassifier(BaseClassifier):
         return out_classifier
 
 
-    def classify(self, atom, ensure_position=False):
-        soaps = self.soaper.create(atom)
+    def classify(self, atom, ensure_position=False, index=None):
+        if index is None:
+            soaps = self.soaper.create(atom)
+        else:
+            soaps = self.soaper.create(atom)[index, :]
+        if len(soaps.shape) < 2:
+            soaps = soaps[np.newaxis, :]
         reduced = self.dim_red.transform(soaps)
         n_clust = self.clusterer.predict(reduced)
 
