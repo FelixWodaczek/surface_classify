@@ -1,13 +1,14 @@
-import os
-import sys
-import pathlib
-from time import time
-from typing import ValuesView
-import numpy as np
-from numpy.random import default_rng
 import json
 import matplotlib.pyplot as plt
+import numpy as np
+from numpy.random import default_rng
+import os
+import pathlib
+import pickle
+import sys
+from time import time
 
+from ase.atoms import Atoms
 from ase.io import write as ase_write
 from ase.io import read as ase_read
 from ase.neighborlist import natural_cutoffs, NeighborList
@@ -15,19 +16,30 @@ from ase.cell import Cell
 
 from dscribe.descriptors import SOAP
 from dscribe.kernels import AverageKernel as ds_AverageKernel
+
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
 from sklearn.metrics.pairwise import rbf_kernel
 
 STANDARD_LOCAL_STRUCTURES_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)),"src/localstructures/")
 
-class NeighbourClassifier():
-    def __init__(self, local_structures_path=None, first_class=3, last_class=9, non_class_max=14, **kwargs):
-        # super().__init__(**kwargs)
-
+class BaseClassifier():
+    def __init__(self, first_class=3, last_class=9, non_class_max=14, **kwargs):
         self.class_low = first_class - 1
         self.class_high = last_class + 1
         self.low_list = [ii for ii in range(0, self.class_low + 1)]
         self.high_list = [ii for ii in range(self.class_high, non_class_max+1)]
         self.non_class_list = self.low_list + self.high_list
+
+    def load_identifiers(self, **kwargs):
+        pass
+
+    def classify(self, **kwargs):
+        pass
+
+class NeighbourClassifier(BaseClassifier):
+    def __init__(self, local_structures_path=None, soap_species=["Rh", "Cu"], **kwargs):
+        super().__init__(**kwargs)
 
         self.local_structures_path = None
         self.info_dict = {}
@@ -35,7 +47,8 @@ class NeighbourClassifier():
         self.identification_dict = {}
         self.n_classes = None
 
-        self.soap_species = ["Rh", "Cu"]
+        self.soap_species = soap_species
+        self.soap_descriptors = None
         self.soap = None
         self.kernel = None
 
@@ -50,6 +63,60 @@ class NeighbourClassifier():
             cat_string = self.id_to_cat(ii_id)
             classes.append(cat_string)
         return classes
+  
+    def id_to_cat(self, id_num):
+            if id_num < len(self.low_list):
+                return str(id_num)
+            elif id_num < len(self.non_class_list):
+                return str(id_num + (self.class_high - len(self.low_list)))
+            else:
+                return self.identification_list[id_num - len(self.non_class_list)]
+
+    @staticmethod
+    def _target_locator(symbols, tar_symbol="Rh"):
+        positions = []
+        for ii_symb, symb in enumerate(symbols):
+            if symb == tar_symbol:
+                positions.append(ii_symb)
+        return positions
+    
+    @staticmethod
+    def _rescale_atom_to_target(atoms, rescale_target):
+        if not isinstance(rescale_target, float):
+            raise TypeError("rescale_target must be of type 'float'!")
+
+        in_atoms = atoms.copy()
+
+        dists = in_atoms.get_all_distances()
+        min_old = np.min(dists[dists>0])
+        rescale_fact = rescale_target/min_old
+
+        scaled_pos = in_atoms.get_scaled_positions()
+        scaled_cell = Cell.new(in_atoms.get_cell().array*rescale_fact)
+        in_atoms.set_cell(scaled_cell)
+
+        in_atoms.set_scaled_positions(scaled_pos)
+
+        return in_atoms
+
+    def _soap_from_structfile(self, struct_file, ii_sf, rescale_target=None, **kwargs):
+        struct_atoms = ase_read(struct_file)
+
+        at_symbs = struct_atoms.get_chemical_symbols()
+        at_pos = self._target_locator(at_symbs)
+
+        if rescale_target is not None:
+            struct_atoms = self._rescale_atom_to_target(struct_atoms, rescale_target)
+
+        if not len(at_pos) == 1:
+            print(struct_atoms)
+            print(at_pos)
+            raise ImportError("More than one Rh Atom in input file %s"%struct_file)
+        else:
+            at_pos = at_pos[0]
+
+        cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...] # TODO: Implement a way to control how many SOAPs are used.
+        return cur_soap
 
     def load_identifiers(self, rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, **kwargs):
         with open(os.path.join(self.local_structures_path, "identifiers.json"), "r") as f:
@@ -87,9 +154,9 @@ class NeighbourClassifier():
 
         self.n_classes = len(self.low_list) + len(self.identification_list) + len(self.high_list) # 0, 1, 2, 10, 11, 12, 13, 14, list, 
 
+        self.soap_descriptors = np.asarray(soap_descriptors)
         # self.kernel = rbf_kernel # TODO: replaces dscribe kernel, seems simpler
         self.kernel = ds_AverageKernel(metric="rbf", gamma=gamma_kernel)
-        # self.kernel = ak.create(self.soap_descriptors) # TODO: see how similar they are to one another
 
     def classify(self, atom, mode='pre_group', n_neigh_by_class=True, ensure_position=False, **kwargs):
         if mode == 'pre_group' or 'class_all':
@@ -135,60 +202,6 @@ class NeighbourClassifier():
                 return neighbour_len, soap_class[0] + len(self.non_class_list)
         else:
             raise ValueError("Mode %s is unknown. Currently available modes: \n'pre_group'\n'class_all'")
-    
-    def _soap_from_structfile(self, struct_file, ii_sf, rescale_target=None, **kwargs):
-        struct_atoms = ase_read(struct_file)
-
-        at_symbs = struct_atoms.get_chemical_symbols()
-        at_pos = self._target_locator(at_symbs)
-
-        if rescale_target is not None:
-            struct_atoms = self._rescale_atom_to_target(struct_atoms, rescale_target)
-
-        if not len(at_pos) == 1:
-            print(struct_atoms)
-            print(at_pos)
-            raise ImportError("More than one Rh Atom in input file %s"%struct_file)
-        else:
-            at_pos = at_pos[0]
-
-        cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...] # TODO: Implement a way to control how many SOAPs are used.
-        return cur_soap
-
-    @staticmethod
-    def _target_locator(symbols, tar_symbol="Rh"):
-        positions = []
-        for ii_symb, symb in enumerate(symbols):
-            if symb == tar_symbol:
-                positions.append(ii_symb)
-        return positions
-    
-    @staticmethod
-    def _rescale_atom_to_target(atoms, rescale_target):
-        if not isinstance(rescale_target, float):
-            raise TypeError("rescale_target must be of type 'float'!")
-
-        in_atoms = atoms.copy()
-
-        dists = in_atoms.get_all_distances()
-        min_old = np.min(dists[dists>0])
-        rescale_fact = rescale_target/min_old
-
-        scaled_pos = in_atoms.get_scaled_positions()
-        scaled_cell = Cell.new(in_atoms.get_cell().array*rescale_fact)
-        in_atoms.set_cell(scaled_cell)
-
-        in_atoms.set_scaled_positions(scaled_pos)
-
-        return in_atoms
-
-    def id_to_cat(self, id_num):
-        if id_num < len(self.low_list):
-            return str(id_num)
-        elif id_num < len(self.non_class_list):
-            return str(id_num + (self.class_high - len(self.low_list)))
-        else:
-            return self.identification_list[id_num - len(self.non_class_list)]
 
 
 class onlyCuClassifier(NeighbourClassifier):
@@ -203,6 +216,11 @@ class onlyCuClassifier(NeighbourClassifier):
 
         self.soap_species = ["Cu"] # Overwrite this so there is no more Rh
 
+    @staticmethod
+    def _target_locator(symbols, tar_symbol=None):
+        # target atom should be in position 0 anyways
+        return [0]
+
     def _soap_from_structfile(self, struct_file, ii_sf, rescale_target=None, **kwargs):
         struct_atoms = ase_read(struct_file)
 
@@ -214,16 +232,84 @@ class onlyCuClassifier(NeighbourClassifier):
         cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...] # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
-    @staticmethod
-    def _target_locator(symbols, tar_symbol=None):
-        # target atom should be in position 0 anyways
-        return [0]
+
+class USMLClassifier(BaseClassifier):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.train_particle = None
+        self.soaper = None
+        self.dim_red = None
+        self.clusterer = None
+
+        self.soap_species = []
+        
+
+    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, soap_species=["Rh", "Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, **kwargs):
+        self.soap_species = soap_species
+        self.train_particle = particle.copy()
+
+        self.soaper = SOAP(species=self.soap_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
+        soaps = self.soaper.create(particle)
+
+        if dim_red is None:
+            self.dim_red = PCA()
+        else:
+            self.dim_red = dim_red
+
+        if clusterer is None:
+            self.clusterer = KMeans()
+        else:
+            self.clusterer = clusterer
+    
+        reduced = self.dim_red.fit_transform(soaps)
+        n_clust = self.clusterer.fit_predict(reduced)
+
+        return n_clust
+    
+    def save(self, file_name="USMLClassifier.pickle", overwrite=False):
+        if not overwrite and os.path.isfile(file_name):
+            raise FileExistsError("File %s already exists. To overwrite its contents set overwrite-flag to 'True'.")
+            
+        with open(file_name, "wb") as f:
+            pickle.dump(self.train_particle, f)
+            pickle.dump(self.soaper, f)
+            pickle.dump(self.dim_red, f)
+            pickle.dump(self.clusterer, f)
+            f.close()
+    
+    @classmethod
+    def load_from_file(cls, file_name, **kwargs):
+        out_classifier = cls(**kwargs)
+
+        with open(file_name, "rb") as f:
+            out_classifier.train_particle = pickle.load(f)
+            out_classifier.soaper = pickle.load(f)
+            out_classifier.dim_red = pickle.load(f)
+            out_classifier.clusterer = pickle.load(f)
+            f.close()
+        
+        return out_classifier
 
 
+    def classify(self, atom, ensure_position=False, index=None):
+        if index is None:
+            soaps = self.soaper.create(atom)
+        else:
+            soaps = self.soaper.create(atom)[index, :]
+        if len(soaps.shape) < 2:
+            soaps = soaps[np.newaxis, :]
+        reduced = self.dim_red.transform(soaps)
+        n_clust = self.clusterer.predict(reduced)
+
+        return n_clust
 
 class NeighbourSort():
-    def __init__(self, **kwargs):        
-        self.classifier = NeighbourClassifier(**kwargs)
+    def __init__(self, classifier=None, **kwargs):
+        if classifier is None:
+            self.classifier = NeighbourClassifier(**kwargs)
+        else:
+            self.classifier = classifier
         self.classifier.load_identifiers(**kwargs)
 
         self.cat_counter = None
@@ -319,13 +405,14 @@ class NeighbourSort():
                 particle_range = (particle_len - np.arange(last_n)[::-1])-1
 
                 cut_off = natural_cutoffs(full_particle, mult=cutoff_mult)
-                neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=True)
+                neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=False)
                 neighbour_list.update(full_particle)
 
                 class_atoms = []
                 for index in particle_range:
                     neighbour_indices, trash = neighbour_list.get_neighbors(index)
-                    neighbour_particle = full_particle[neighbour_indices[:-1]]
+                    neighbour_indices = np.append(np.array([index]), neighbour_indices, axis=0)
+                    neighbour_particle = full_particle[neighbour_indices]
                     class_atoms.append(neighbour_particle)
 
                     n_neighbours = len(neighbour_particle) - 1
@@ -370,13 +457,14 @@ class NeighbourSort():
 
         # set up neighbourlist
         cut_off = natural_cutoffs(original_particle, mult=0.9)
-        neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=True)
+        neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=False)
         neighbour_list.update(original_particle)
 
         # Determine number of neighbours for each atom in nanoparticle
         n_neighs = [] 
         for nn_atom in range(n_atoms):
             neighbour_indices, trash = neighbour_list.get_neighbors(nn_atom)
+            neighbour_indices = np.append(np.array([nn_atom]), neighbour_indices, axis=0)
             n_neighs.append(len(neighbour_indices))
         n_neighs = np.asarray(n_neighs, dtype=np.int32)
 
