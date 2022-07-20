@@ -405,13 +405,14 @@ class NeighbourSort():
                 particle_range = (particle_len - np.arange(last_n)[::-1])-1
 
                 cut_off = natural_cutoffs(full_particle, mult=cutoff_mult)
-                neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=True)
+                neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=False)
                 neighbour_list.update(full_particle)
 
                 class_atoms = []
                 for index in particle_range:
                     neighbour_indices, trash = neighbour_list.get_neighbors(index)
-                    neighbour_particle = full_particle[neighbour_indices[:-1]]
+                    neighbour_indices = np.append(np.array([index]), neighbour_indices, axis=0)
+                    neighbour_particle = full_particle[neighbour_indices]
                     class_atoms.append(neighbour_particle)
 
                     n_neighbours = len(neighbour_particle) - 1
@@ -456,13 +457,14 @@ class NeighbourSort():
 
         # set up neighbourlist
         cut_off = natural_cutoffs(original_particle, mult=0.9)
-        neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=True)
+        neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=False)
         neighbour_list.update(original_particle)
 
         # Determine number of neighbours for each atom in nanoparticle
         n_neighs = [] 
         for nn_atom in range(n_atoms):
             neighbour_indices, trash = neighbour_list.get_neighbors(nn_atom)
+            neighbour_indices = np.append(np.array([nn_atom]), neighbour_indices, axis=0)
             n_neighs.append(len(neighbour_indices))
         n_neighs = np.asarray(n_neighs, dtype=np.int32)
 
