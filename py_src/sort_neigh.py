@@ -115,7 +115,7 @@ class NeighbourClassifier(BaseClassifier):
         else:
             at_pos = at_pos[0]
 
-        cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...] # TODO: Implement a way to control how many SOAPs are used.
+        cur_soap = self.soap.create(struct_atoms, positions=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
     def load_identifiers(self, rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, **kwargs):
@@ -179,7 +179,7 @@ class NeighbourClassifier(BaseClassifier):
                         at_pos = at_pos[0]
                 else:
                     at_pos = 0
-            soap_atom = self.soap.create(atom)[at_pos, :][np.newaxis, np.newaxis, ...]
+            soap_atom = self.soap.create(atom, positions=[at_pos])[np.newaxis, ...]
 
             if mode == 'pre_group':
                 soap_base = self.identification_dict[str(neighbour_len)]["soap_descr"]
@@ -194,14 +194,15 @@ class NeighbourClassifier(BaseClassifier):
 
                 assert soap_atom.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atom.shape[0], soap_base[0].shape[0])
                 similarities = self.kernel.create(soap_base, soap_atom)
-                
                 soap_class = np.argmax(similarities, axis=0)
-                if n_neigh_by_class:
-                    neighbour_len = int(self.id_to_cat(soap_class[0] + len(self.non_class_list))[0])
+                class_id = soap_class[0] + len(self.non_class_list)
 
-                return neighbour_len, soap_class[0] + len(self.non_class_list)
+                if n_neigh_by_class:
+                    neighbour_len = int(self.id_to_cat(class_id)[0])
+
+                return neighbour_len, class_id
         else:
-            raise ValueError("Mode %s is unknown. Currently available modes: \n'pre_group'\n'class_all'")
+            raise ValueError("Mode %s is unknown. Currently available modes: \n'pre_group'\n'class_all'"%mode)
 
 
 class onlyCuClassifier(NeighbourClassifier):
@@ -229,7 +230,7 @@ class onlyCuClassifier(NeighbourClassifier):
         if rescale_target is not None:
             struct_atoms = self._rescale_atom_to_target(struct_atoms, rescale_target)
 
-        cur_soap = self.soap.create(struct_atoms)[at_pos, :][np.newaxis, ...] # TODO: Implement a way to control how many SOAPs are used.
+        cur_soap = self.soap.create(struct_atoms, positions=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
 
@@ -237,21 +238,16 @@ class USMLClassifier(BaseClassifier):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.train_particle = None
         self.soaper = None
+        self.train_soaps = None
+
+        self.train_particle = None
         self.dim_red = None
         self.clusterer = None
 
         self.soap_species = []
         
-
-    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, soap_species=["Rh", "Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, **kwargs):
-        self.soap_species = soap_species
-        self.train_particle = particle.copy()
-
-        self.soaper = SOAP(species=self.soap_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
-        soaps = self.soaper.create(particle)
-
+    def _train_on_data(self, data, dim_red=None, clusterer=None):
         if dim_red is None:
             self.dim_red = PCA()
         else:
@@ -262,10 +258,19 @@ class USMLClassifier(BaseClassifier):
         else:
             self.clusterer = clusterer
     
-        reduced = self.dim_red.fit_transform(soaps)
+        reduced = self.dim_red.fit_transform(data)
         n_clust = self.clusterer.fit_predict(reduced)
 
         return n_clust
+
+    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, soap_species=["Rh", "Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, **kwargs):
+        self.soap_species = soap_species
+        self.train_particle = particle.copy()
+
+        self.soaper = SOAP(species=self.soap_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
+        soaps = self.soaper.create(particle)
+
+        return self._train_on_data(soaps, dim_red=dim_red, clusterer=clusterer)
     
     def save(self, file_name="USMLClassifier.pickle", overwrite=False):
         if not overwrite and os.path.isfile(file_name):
@@ -508,7 +513,8 @@ class NeighbourSort():
         np.savetxt(file_name, print_cat, header=header, fmt='%u')
         return file_name
 
-    def load_sort_cat(self, file_name):
+    @staticmethod
+    def load_sort_cat(file_name):
         with open(file_name, "r") as f:
             cat_line = f.read().split('\n')[1]
             cat_line = cat_line.split(' ')
