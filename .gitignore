@@ -137,6 +137,7 @@ dmypy.json
 *.zip
 !/src/localstructures/*.extxyz
 !/src/localstructures_onlyCu/*.extxyz
+!/src/localstructures_newopt/*.extxyz
 *.lammpstrj
 *.npy
 

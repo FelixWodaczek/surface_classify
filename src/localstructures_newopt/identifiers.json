@@ -1,0 +1,19 @@
+{
+    "identification_list": [
+        "3_neighbour",
+        "4_neighbour",
+        "4_atop",
+        "5_211b5ad",
+        "5_b5110ad",
+        "5_terrace",
+        "6_211110_corner",
+        "6_terrace",
+        "7_110",
+        "7_211_surf",
+        "8_terminal",
+        "8_vacsite",
+        "9_111_term",
+        "9_invalid",
+        "9_invalid2"
+    ]
+}
