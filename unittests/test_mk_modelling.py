@@ -18,7 +18,7 @@ class TestMkModelling(unittest.TestCase):
         mk_modeller = MkModeller()
         mk_modeller.y_mask[:] = np.nan
 
-        mk_modeller.k[...] = self.rng.random((9, 2))
+        mk_modeller.k[...] = self.rng.random((8, 2))
         sol = mk_modeller.solve(n_timesteps)
         
         assert sol.shape[0] == n_timesteps
@@ -31,7 +31,7 @@ class TestMkModelling(unittest.TestCase):
         mk_modeller.y_mask[:] = 1.
 
         mk_modeller.y_mask[:] = 1.
-        mk_modeller.k[...] = self.rng.random((9, 2))
+        mk_modeller.k[...] = self.rng.random((8, 2))
         sol = mk_modeller.solve(n_timesteps)
 
         assert sol.shape[0] == n_timesteps
@@ -42,7 +42,7 @@ class TestMkModelling(unittest.TestCase):
             mk_modeller = MkModeller()
             mk_modeller.y_mask[:] = np.nan 
             mk_modeller.y_mask[ii_test] = 0.3
-            mk_modeller.k[...] = self.rng.random((9, 2))
+            mk_modeller.k[...] = self.rng.random((8, 2))
 
             sol = mk_modeller.solve(30)
 

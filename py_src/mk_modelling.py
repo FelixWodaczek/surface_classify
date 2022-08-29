@@ -6,7 +6,7 @@ from scipy.constants import Boltzmann
 class MkModeller:
     def __init__(self):
         self.diffusion = np.zeros((9, ), dtype=np.float64)
-        self.k = np.zeros((9, 2), dtype=np.float64)
+        self.k = np.zeros((8, 2), dtype=np.float64)
 
         self.y_mask = np.empty((9, ), np.float64)
         self.y_mask[0] = 1.
