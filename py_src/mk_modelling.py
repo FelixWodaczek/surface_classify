@@ -53,7 +53,7 @@ class MkModeller:
         return self.diffusion
 
 
-    def solve(self, n_steps, y_0=None, target_function=None, method='adams', rtol='1e-6', max_step='1e-12', with_jacobian=True):
+    def solve(self, n_steps, y_0=None, target_function=None, method='adams', rtol=1e-6, max_step=1e-12, with_jacobian=True):
         self.init_mask_cond()
 
         if y_0 is None:

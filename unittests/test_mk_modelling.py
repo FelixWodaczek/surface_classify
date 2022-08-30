@@ -75,7 +75,7 @@ class TestMkModelling(unittest.TestCase):
             y_0[:] = 0.
             y_0[index_pair] = 1.
 
-            sol = mk_modeller.solve(100, y_0=y_0)
+            sol = mk_modeller.solve(100, y_0=y_0, max_step=1e-2)
 
             final_values = sol[-1, :]
             assert np.allclose(np.delete(final_values, index_pair), 0.), "Leakage at %s"%(
