@@ -63,7 +63,7 @@ class MkModeller:
         if target_function is None:
             target_function = self.constrained_soe
 
-        solver = ode(target_function).set_integrator('vode', method='adams')
+        solver = ode(target_function).set_integrator('vode', method='adams', rtol='1e-6', max_step='1e-12', with_jacobian=True)
         solver.set_initial_value(y=y_0, t=0)
         
         solution = np.zeros((n_steps, y_0.shape[0]))
