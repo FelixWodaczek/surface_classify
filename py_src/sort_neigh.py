@@ -11,6 +11,7 @@ from time import time
 from ase.atoms import Atoms
 from ase.io import write as ase_write
 from ase.io import read as ase_read
+from ase.build import sort as ase_sort
 from ase.neighborlist import natural_cutoffs, NeighborList
 from ase.cell import Cell
 
@@ -317,10 +318,30 @@ class NeighbourSort():
             self.classifier = classifier
         self.classifier.load_identifiers(**kwargs)
 
+        self.particle_trajectory = None
+
         self.cat_counter = None
         self.or_file = None
         self.work_dir_path = None
         self.timesteps = None
+
+    def load_particle(self, file_path, make_folders=False, timesteps=None, **kwargs):
+        if make_folders:
+            self.init_folder_structure(file_path=file_path, timesteps=timesteps, **kwargs)
+
+        else:
+            self.or_file_path = os.path.abspath(file_path)
+            self.particle_trajectory = ase_read(file_path, index=':') # This loads the whole trajectory into memory, possibly a problem but should be fine
+
+            self.timesteps = len(self.particle_trajectory)
+            if timesteps is not None:
+                if timesteps <= self.timesteps:
+                    self.timesteps = timesteps
+                else:
+                    raise ValueError("There is only %u timesteps in particle, therefore cannot analyze %u steps."%(self.timesteps, timesteps))
+
+            for n_particle in range(self.timesteps):
+                self.particle_trajectory[n_particle] = ase_sort(self.particle_trajectory[n_particle]) # So Rh is always in the last indices
 
     def init_folder_structure(self, file_path, n_head=9, n_tail=0, n_atoms_in_part=1400, timesteps=None, out_dir=None):
         if timesteps is None:
@@ -396,9 +417,43 @@ class NeighbourSort():
         sorted_part_count = np.take(cat_counter, sort_arr, axis=1)
         return sorted_classes, sorted_part_count
 
-    def create_local_structure(self, last_n=14, create_subfolders=True, cutoff_mult=0.9, **kwargs):
-        self.cat_counter = np.zeros(shape=(self.timesteps, self.classifier.n_classes), dtype=np.int32)
+    def create_local_structure(self, cutoff_mult=0.9, last_n=14, **kwargs):
+        if self.particle_trajectory is not None:
+            self.cat_counter = np.zeros(shape=(self.timesteps, self.classifier.n_classes), dtype=np.int32)
 
+            init_particle = self.particle_trajectory[0]
+            particle_len = len(init_particle)
+            particle_range = (particle_len - np.arange(last_n)[::-1])-1
+
+            cut_off = natural_cutoffs(init_particle, mult=cutoff_mult)
+            neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=False)
+            neighbour_list.update(init_particle)
+
+            for step in self.progressbar(range(self.timesteps), "At Timestep:", size=40):
+                cur_particle = self.particle_trajectory[step]
+                neighbour_list.update(cur_particle)
+
+                for index in particle_range:
+                    neighbour_indices, dists = neighbour_list.get_neighbors(index)
+                    neighbour_indices = np.append(np.array([index]), neighbour_indices, axis=0)
+
+                    neighbour_particle = cur_particle[neighbour_indices]
+                    n_neighbours = len(neighbour_particle) - 1
+                    
+                    n_neigh, class_id = self.classifier.classify(neighbour_particle, **kwargs)
+                    self.cat_counter[step, class_id] += 1
+
+            return self.cat_counter
+        else:
+            if self.work_dir_path is None:
+                raise ValueError("""No particle loaded in self.particle_trajectory or self.work_dir_path.
+                To create local structure use load_particle to initialise the target particle either in memory or subfolders.
+                """)
+            return self._locstruct_from_folder(last_n=last_n, cutoff_mult=cutoff_mult, **kwargs)
+
+
+    def _locstruct_from_folder(self, last_n=14, create_subfolders=True, cutoff_mult=0.9, **kwargs):
+        self.cat_counter = np.zeros(shape=(self.timesteps, self.classifier.n_classes), dtype=np.int32)
         for step in self.progressbar(range(self.timesteps), "At Timestep:", size=40):
 
             cur_dir = pathlib.Path(os.path.join(self.work_dir_path, "ts_%u/"%step))
