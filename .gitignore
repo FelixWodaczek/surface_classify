@@ -139,6 +139,10 @@ dmypy.json
 !/src/localstructures_onlyCu/*.extxyz
 !/src/localstructures_newopt/*.extxyz
 !/src/localstructures_newopt_onlyCu_altered/*.extxyz
+!src/localstructures_newopt_rh/*.extxyz
+!src/localstructures_newopt_pd/*.extxyz
+!src/localstructures_newopt_mcmd_rh/*.extxyz
+!src/localstructures_newopt_mcmd_pd/*.extxyz
 *.lammpstrj
 *.npy
 
