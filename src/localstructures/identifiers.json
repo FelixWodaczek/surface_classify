@@ -1,19 +1,19 @@
 {
     "identification_list": [
-        "3_neighbour",
+        "3_111_ad_atom",
         "4_neighbour",
         "4_atop",
-        "5_211b5ad",
-        "5_b5110ad",
-        "5_terrace",
-        "6_211110_corner",
-        "6_terrace",
+        "5_211_ad_atom",
+        "5_110_ad_atom",
+        "5_111_terrace",
+        "6_100-110_interface",
+        "6_100_terrace",
         "7_110",
-        "7_211_surf",
-        "8_terminal",
-        "8_vacsite",
+        "7_211",
+        "8_100",
+        "8_111_vacant_site",
         "9_111_term",
         "9_invalid",
-        "9_invalid2"
+        "9_invalid_2"
     ]
 }

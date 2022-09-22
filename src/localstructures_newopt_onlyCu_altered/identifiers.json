@@ -1,20 +1,20 @@
 {
     "identification_list": [
-        "3_111 ad atom",
-        "4_111 ad atom pair",
-        "4_100 ad atom",
-        "5_211 ad atom",
-        "5_110 ad atom",
-        "5_111 terrace",
-        "6_100-110 interface",
-        "6_100 terrace",
+        "3_111_ad_atom",
+        "4_111_ad_atom_pair",
+        "4_100_ad_atom",
+        "5_211_ad_atom",
+        "5_110_ad_atom",
+        "5_111_terrace",
+        "6_100-110_interface",
+        "6_100_terrace",
         "7_110",
         "7_211",
         "8_100",
-        "8_111 vacant site",
+        "8_111_vacant_site",
         "9_111",
         "9_invalid",
-        "9_invalid 2"
+        "9_invalid_2"
     ],
     "center_pos": [
         0,
