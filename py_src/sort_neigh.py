@@ -579,6 +579,42 @@ class NeighbourSort():
         cat_counter = np.loadtxt(file_name, dtype=np.int32)
 
         return cat_counter[:, 1:], cat_counter[:, 0], sorted_cats
+    
+    @staticmethod
+    def block_average(counts, block_size=10, mode='blocks'):
+        """Calculate variance of sites using blocked averages.
+
+        Args:
+            counts (np.ndarray): array of dim 2, shaped timesteps x categories
+            block_size (int, optional): Number of elements per block. Defaults to 10.
+            mode (str, optional): Mode to calculate blocks.
+            Currently available:
+                -> 'blocks': Take block_size consecutive timesteps from counts.
+            Defaults to 'blocks'.
+
+        Returns:
+            np.ndarray: floats shaped categories, with block error in each element.
+        """
+        # TODO: add strided mode
+        if not (len(counts.shape)) == 2:
+            raise ValueError("Dimension of variable counts needs to be exactly 2: timesteps x categories")
+
+        if mode == 'blocks':
+            n_timesteps = counts.shape[0]
+            n_blocks = n_timesteps // block_size
+
+            total_sites = np.sum(counts, axis=0)
+
+            blocked_cats = counts[:n_blocks*block_size, :].reshape((n_blocks, block_size, counts.shape[-1]))
+            block_totals = np.sum(blocked_cats, axis=-2)
+
+            brackets = (block_totals - (total_sites/float(n_blocks)))**2
+            exp_val = np.sum(brackets, axis=-2) / float(n_blocks)
+
+            err = n_blocks * np.sqrt(exp_val/float(n_blocks))
+            return err
+        else:
+            raise ValueError("Mode '%s' is not a valid mode for forming the blocks."%mode)
 
     @staticmethod
     def progressbar(it, prefix="", size=60, file=sys.stdout):
