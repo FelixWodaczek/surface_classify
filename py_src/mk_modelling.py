@@ -30,9 +30,9 @@ class MkModeller:
     def system_of_equations(self, t, y):
         self.diffusion[:] = 0.
 
-        star = 1 - np.sum(y[1:6]) - y[7]
-        self.diffusion[0] = self.k[0, 0] * y[1] - self.k[0, 1] * y[0] 
-        self.diffusion[1] = self.k[0, 1] * y[0] - self.k[1, 1] * y[1] + self.k[1, 0] * y[2] - self.k[2, 1] * y[1] + self.k[2, 0] * y[3] - self.k[0, 0] * y[1]
+        star = 1 - y[1] - y[2] - y[3] - y[4] - y[5] - y[7]
+        self.diffusion[0] = self.k[0, 0] * y[1] - self.k[0, 1] * y[0] * star
+        self.diffusion[1] = self.k[0, 1] * y[0] * star - self.k[1, 1] * y[1] + self.k[1, 0] * y[2] - self.k[2, 1] * y[1] + self.k[2, 0] * y[3] - self.k[0, 0] * y[1]
         self.diffusion[2] = self.k[1, 1] * y[1] - self.k[1, 0] * y[2] + self.k[3, 0] * y[4] - self.k[3, 1] * y[2]
         self.diffusion[3] = self.k[2, 1] * y[1] - self.k[2, 0] * y[3] + self.k[4, 0] * y[4] - self.k[4, 1] * y[3]
         self.diffusion[4] = self.k[3, 1] * y[2] + self.k[4, 1] * y[3] + self.k[5, 0] * y[5] * y[6] - self.k[3, 0] * y[4] - self.k[4, 0] * y[4] - self.k[5, 1] * y[4]
