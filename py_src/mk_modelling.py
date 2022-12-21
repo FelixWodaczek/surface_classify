@@ -6,7 +6,7 @@ from scipy.constants import Boltzmann
 class MkModeller:
     def __init__(self):
         self.diffusion = np.zeros((9, ), dtype=np.float64)
-        self.k = np.zeros((9, 2), dtype=np.float64)
+        self.k = np.zeros((8, 2), dtype=np.float64)
 
         self.y_mask = np.empty((9, ), np.float64)
         self.y_mask[0] = 1.
@@ -30,9 +30,9 @@ class MkModeller:
     def system_of_equations(self, t, y):
         self.diffusion[:] = 0.
 
-        star = 1 - np.sum(y[1:6]) - y[7]
-        self.diffusion[0] = self.k[0, 0] * y[1] - self.k[0, 1] * y[0] 
-        self.diffusion[1] = self.k[0, 1] * y[0] - self.k[1, 1] * y[1] + self.k[1, 0] * y[2] - self.k[2, 1] * y[1] + self.k[2, 0] * y[3] - self.k[0, 0] * y[1]
+        star = 1 - y[1] - y[2] - y[3] - y[4] - y[5] - y[7]
+        self.diffusion[0] = self.k[0, 0] * y[1] - self.k[0, 1] * y[0] * star
+        self.diffusion[1] = self.k[0, 1] * y[0] * star - self.k[1, 1] * y[1] + self.k[1, 0] * y[2] - self.k[2, 1] * y[1] + self.k[2, 0] * y[3] - self.k[0, 0] * y[1]
         self.diffusion[2] = self.k[1, 1] * y[1] - self.k[1, 0] * y[2] + self.k[3, 0] * y[4] - self.k[3, 1] * y[2]
         self.diffusion[3] = self.k[2, 1] * y[1] - self.k[2, 0] * y[3] + self.k[4, 0] * y[4] - self.k[4, 1] * y[3]
         self.diffusion[4] = self.k[3, 1] * y[2] + self.k[4, 1] * y[3] + self.k[5, 0] * y[5] * y[6] - self.k[3, 0] * y[4] - self.k[4, 0] * y[4] - self.k[5, 1] * y[4]
@@ -53,7 +53,7 @@ class MkModeller:
         return self.diffusion
 
 
-    def solve(self, n_steps, y_0=None, target_function=None):
+    def solve(self, n_steps, y_0=None, target_function=None, method='adams', rtol=1e-6, max_step=1e-12, with_jacobian=True):
         self.init_mask_cond()
 
         if y_0 is None:
@@ -63,7 +63,7 @@ class MkModeller:
         if target_function is None:
             target_function = self.constrained_soe
 
-        solver = ode(target_function).set_integrator('vode', method='adams')
+        solver = ode(target_function).set_integrator('vode', method=method, rtol=rtol, max_step=max_step, with_jacobian=with_jacobian)
         solver.set_initial_value(y=y_0, t=0)
         
         solution = np.zeros((n_steps, y_0.shape[0]))
