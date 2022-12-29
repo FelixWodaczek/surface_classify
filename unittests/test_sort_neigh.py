@@ -61,7 +61,7 @@ class TestSortNeigh(unittest.TestCase):
         neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=False)
         neighbour_list.update(full_particle)
         
-        soaps = ml_classifier.soaper.create(full_particle)
+        soaps = ml_classifier.descr.create(full_particle)
         red_part = ml_classifier.dim_red.transform(soaps)
         # plt.scatter(red_part[:, 0], red_part[:, 1], marker='s', c=train_clusters)
 
@@ -74,7 +74,7 @@ class TestSortNeigh(unittest.TestCase):
             neighbour_particle = full_particle[neighbour_indices]
             series_cluster[atom_index] = ml_classifier.classify(neighbour_particle)[0]
 
-            soaps = ml_classifier.soaper.create(neighbour_particle)
+            soaps = ml_classifier.descr.create(neighbour_particle)
             red_part = ml_classifier.dim_red.transform(soaps)
             plot_2[atom_index, 0] = red_part[0, 0]
             plot_2[atom_index, 1] = red_part[0, 1]
