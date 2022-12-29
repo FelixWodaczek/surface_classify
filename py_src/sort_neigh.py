@@ -39,7 +39,7 @@ class BaseClassifier():
         pass
 
 class NeighbourClassifier(BaseClassifier):
-    def __init__(self, local_structures_path=None, soap_species=["Rh", "Cu"], **kwargs):
+    def __init__(self, local_structures_path=None, descr_species=["Rh", "Cu"], **kwargs):
         super().__init__(**kwargs)
 
         self.local_structures_path = None
@@ -48,9 +48,9 @@ class NeighbourClassifier(BaseClassifier):
         self.identification_dict = {}
         self.n_classes = None
 
-        self.soap_species = soap_species
-        self.soap_descriptors = None
-        self.soap = None
+        self.descr_species = descr_species
+        self.atomic_descriptors = None
+        self.descr = None
         self.kernel = None
 
         if local_structures_path is None:
@@ -116,10 +116,10 @@ class NeighbourClassifier(BaseClassifier):
         else:
             at_pos = at_pos[0]
 
-        cur_soap = self.soap.create(struct_atoms, positions=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
+        cur_soap = self.descr.create(struct_atoms, positions=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
-    def load_identifiers(self, rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, **kwargs):
+    def load_identifiers(self, rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, descr_func=None, **kwargs):
         with open(os.path.join(self.local_structures_path, "identifiers.json"), "r") as f:
             json_dict = json.load(f)
             f.close()
@@ -130,7 +130,10 @@ class NeighbourClassifier(BaseClassifier):
         for ii_struct in range(15):
             self.identification_dict[str(ii_struct)] = {"soap_descr": [], "id_num": [], "id": []}
 
-        self.soap = SOAP(species=self.soap_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
+        if descr_func is None:
+            self.descr = SOAP(species=self.descr_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
+        else:
+            self.descr = descr_func
 
         soap_descriptors = []
         struct_file_names = []
@@ -155,7 +158,7 @@ class NeighbourClassifier(BaseClassifier):
 
         self.n_classes = len(self.low_list) + len(self.identification_list) + len(self.high_list) # 0, 1, 2, 10, 11, 12, 13, 14, list, 
 
-        self.soap_descriptors = np.asarray(soap_descriptors)
+        self.atomic_descriptors = np.asarray(soap_descriptors)
         # self.kernel = rbf_kernel # TODO: replaces dscribe kernel, seems simpler
         self.kernel = ds_AverageKernel(metric="rbf", gamma=gamma_kernel)
 
@@ -180,7 +183,7 @@ class NeighbourClassifier(BaseClassifier):
                         at_pos = at_pos[0]
                 else:
                     at_pos = 0
-            soap_atom = self.soap.create(atom, positions=[at_pos])[np.newaxis, ...]
+            soap_atom = self.descr.create(atom, positions=[at_pos])[np.newaxis, ...]
 
             if mode == 'pre_group':
                 soap_base = self.identification_dict[str(neighbour_len)]["soap_descr"]
@@ -191,7 +194,7 @@ class NeighbourClassifier(BaseClassifier):
                 return neighbour_len, self.identification_dict[str(neighbour_len)]["id_num"][int(soap_class)]
             
             elif mode == 'class_all':
-                soap_base = self.soap_descriptors
+                soap_base = self.atomic_descriptors
 
                 assert soap_atom.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atom.shape[0], soap_base[0].shape[0])
                 similarities = self.kernel.create(soap_base, soap_atom)
@@ -216,7 +219,7 @@ class onlyCuClassifier(NeighbourClassifier):
         else:
             self.local_structures_path = local_structures_path
 
-        self.soap_species = ["Cu"] # Overwrite this so there is no more Rh
+        self.descr_species = ["Cu"] # Overwrite this so there is no more Rh
 
     @staticmethod
     def _target_locator(symbols, tar_symbol=None):
@@ -231,7 +234,7 @@ class onlyCuClassifier(NeighbourClassifier):
         if rescale_target is not None:
             struct_atoms = self._rescale_atom_to_target(struct_atoms, rescale_target)
 
-        cur_soap = self.soap.create(struct_atoms, positions=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
+        cur_soap = self.descr.create(struct_atoms, positions=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
 
@@ -239,14 +242,14 @@ class USMLClassifier(BaseClassifier):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.soaper = None
+        self.descr = None
         self.train_soaps = None
 
         self.train_particle = None
         self.dim_red = None
         self.clusterer = None
 
-        self.soap_species = []
+        self.descr_species = []
         
     def _train_on_data(self, data, dim_red=None, clusterer=None):
         if dim_red is None:
@@ -264,12 +267,15 @@ class USMLClassifier(BaseClassifier):
 
         return n_clust
 
-    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, soap_species=["Rh", "Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, **kwargs):
-        self.soap_species = soap_species
+    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, descr_species=["Rh", "Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, descr_func=None, **kwargs):
+        self.descr_species = descr_species
         self.train_particle = particle.copy()
 
-        self.soaper = SOAP(species=self.soap_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
-        soaps = self.soaper.create(particle)
+        if descr_func is None:
+            self.descr = SOAP(species=self.descr_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
+        else:
+            self.descr = descr_func
+        soaps = self.descr.create(particle)
 
         return self._train_on_data(soaps, dim_red=dim_red, clusterer=clusterer)
     
@@ -279,7 +285,7 @@ class USMLClassifier(BaseClassifier):
             
         with open(file_name, "wb") as f:
             pickle.dump(self.train_particle, f)
-            pickle.dump(self.soaper, f)
+            pickle.dump(self.descr, f)
             pickle.dump(self.dim_red, f)
             pickle.dump(self.clusterer, f)
             f.close()
@@ -290,7 +296,7 @@ class USMLClassifier(BaseClassifier):
 
         with open(file_name, "rb") as f:
             out_classifier.train_particle = pickle.load(f)
-            out_classifier.soaper = pickle.load(f)
+            out_classifier.descr = pickle.load(f)
             out_classifier.dim_red = pickle.load(f)
             out_classifier.clusterer = pickle.load(f)
             f.close()
@@ -300,9 +306,9 @@ class USMLClassifier(BaseClassifier):
 
     def classify(self, atom, ensure_position=False, index=None):
         if index is None:
-            soaps = self.soaper.create(atom)
+            soaps = self.descr.create(atom)
         else:
-            soaps = self.soaper.create(atom)[index, :]
+            soaps = self.descr.create(atom)[index, :]
         if len(soaps.shape) < 2:
             soaps = soaps[np.newaxis, :]
         reduced = self.dim_red.transform(soaps)
