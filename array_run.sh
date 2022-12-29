@@ -17,7 +17,7 @@
 #
 #Define the number of hours the job should run. 
 #Maximum runtime is limited to 10 days, ie. 240 hours
-#SBATCH --time=2:00:00
+#SBATCH --time=1:30:00
 #
 #Define the amount of RAM used by your job in GigaBytes
 #In shared memory applications this is shared among multiple CPUs
@@ -39,4 +39,4 @@ module load python3
 # in different iteration of the script execution
 #----------------------------------------------------------------
 
-python3 run_analysis.py
+python3 slurm_classify.py -m 'soap_sort' # soap_sort, lmbtr_sort, soap_gendescr, lmbtr_gendescr
