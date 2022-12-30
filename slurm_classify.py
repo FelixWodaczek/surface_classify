@@ -129,7 +129,7 @@ def analyse_file(fpath, mode):
     else:
         raise ValueError("Mode %s not known. Available modes: soap_sort, lmbtr_sort, soap_gendescr, lmbtr_gendescr"%mode)
 
-def slurm_analyse_file(mode, struct_path):
+def slurm_analyse_file(mode):
     with open("target_files.txt", "r") as f:
         file_list = f.read().split('\n')[:-1]
 

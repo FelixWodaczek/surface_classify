@@ -17,11 +17,11 @@
 #
 #Define the number of hours the job should run. 
 #Maximum runtime is limited to 10 days, ie. 240 hours
-#SBATCH --time=1:30:00
+#SBATCH --time=2:00:00
 #
 #Define the amount of RAM used by your job in GigaBytes
 #In shared memory applications this is shared among multiple CPUs
-#SBATCH --mem=1G
+#SBATCH --mem=2G
 #
 #Do not requeue the job in the case it fails.
 #SBATCH --no-requeue
@@ -32,11 +32,12 @@ unset SLURM_EXPORT_ENV
 
 # load the respective software module(s) you intend to use
 #----------------------------------------------------------------
-module load python3
-
+module load python/3.9.7
+source SURFCLASS_VENV01/bin/activate
 # define sequence of jobs to run as you would do in a BASH script
 # use variable $SLURM_ARRAY_TASK_ID to address individual behaviour
 # in different iteration of the script execution
 #----------------------------------------------------------------
 
 python3 slurm_classify.py -m 'soap_sort' # soap_sort, lmbtr_sort, soap_gendescr, lmbtr_gendescr
+deactivate
