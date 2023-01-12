@@ -444,6 +444,8 @@ class NeighbourSort():
                     neighbour_indices = np.append(np.array([index]), neighbour_indices, axis=0)
 
                     neighbour_particle = cur_particle[neighbour_indices]
+                    neighbour_particle.symbols[:] = 'Cu'
+                    neighbour_particle.symbols[0] = 'Rh'
                     n_neighbours = len(neighbour_particle) - 1
                     
                     n_neigh, class_id = self.classifier.classify(neighbour_particle, **kwargs)
