@@ -40,18 +40,21 @@ def analyse_file(fpath, mode):
     if (mode=="soap_sort") or (mode=="lmbtr_sort"):
         
         # First figure out whether or not to use pd identifiers
-        pd_re = re.compile(r".*\/pd\/.*")
-        if pd_re.match(fpath):
-            print("Using PD structures")
-            struct_path = os.path.abspath("src/localstructures_newopt_pd")
+        if not ("mcmd" in fpath):
+            struct_path = os.path.abspath("src/localstructures_final_mc")
         else:
-            struct_path = os.path.abspath("src/localstructures_newopt_rh")
+            pd_re = re.compile(r".*\/pd\/.*")
+            if pd_re.match(fpath):
+                print("Using PD structures")
+                struct_path = os.path.abspath("src/localstructures_final_mcmd_pd")
+            else:
+                struct_path = os.path.abspath("src/localstructures_final_mcmd_rh")
 
         if mode == "soap_sort":
-            rcut=4.2
+            rcut=5.2 # 4.2 # 2.7 
             nmax=4
             lmax=3
-            sigma=0.6
+            sigma=1.
             gamma_kernel=1.
 
             sorter = sort_neigh.NeighbourSort(
@@ -95,7 +98,7 @@ def analyse_file(fpath, mode):
             file_name=save_txt_path, cat_counter=cat_counter
         )
 
-    elif (mode=="soap_gendescr") or (mode=="lmbtr_gendescr"):
+    elif (mode=="soap_gendescr") or (mode=="lmbtr_gendescr") or (mode=="lmbtrpca_gendescr"):
         trajectory = ase_read(fpath, index=':')
         n_timesteps = len(trajectory)
         ts_buffersize = 100 #How many timesteps to save in numpy array before flushing to file
@@ -143,9 +146,9 @@ def analyse_file(fpath, mode):
             fname = os.path.basename(fpath).split('.')[0]
             save_txt_path = os.path.join(os.path.dirname(fpath), fname+"_lmbtr_%ux%u.txt"%(n_timesteps, n_rhod))
 
-        elif mode=="lmbtrsoap_gendescr":
+        elif mode=="lmbtrpca_gendescr":
             n_spec = 180
-            n_pca = 40
+            n_pca = 10
 
             lmbtr = LMBTR(
                 species=["Rh", "Cu"],
@@ -170,7 +173,7 @@ def analyse_file(fpath, mode):
                 local_structures_path=struct_path,
                 non_class_max=14
             )
-            standard_classifier.load_identifiers(descr_func=descr)
+            standard_classifier.load_identifiers(descr_func=lmbtr)
             dict_lmbtr = _descriptors_from_classifier(standard_classifier)
             pca = PCA(n_components=n_pca)
             lmbtr_red = pca.fit_transform(dict_lmbtr)
