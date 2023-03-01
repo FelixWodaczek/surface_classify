@@ -9,3 +9,6 @@ src/localstructures_newopt_pd/*.extxyz filter=lfs diff=lfs merge=lfs -text
 src/localstructures_newopt_mcmd_rh/*.extxyz filter=lfs diff=lfs merge=lfs -text
 src/localstructures_newopt_mcmd_pd/*.extxyz filter=lfs diff=lfs merge=lfs -text
 simulation_data/** filter=lfs diff=lfs merge=lfs -text
+src/localstructures_final_mc/*.extxyz filter=lfs diff=lfs merge=lfs -text
+src/localstructures_final_mcmd_pd/*.extxyz filter=lfs diff=lfs merge=lfs -text
+src/localstructures_final_mcmd_rh/*.extxyz filter=lfs diff=lfs merge=lfs -text
