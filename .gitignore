@@ -143,6 +143,7 @@ dmypy.json
 !src/localstructures_newopt_pd/*.extxyz
 !src/localstructures_newopt_mcmd_rh/*.extxyz
 !src/localstructures_newopt_mcmd_pd/*.extxyz
+!simulation_data/**
 *.lammpstrj
 *.npy
 
