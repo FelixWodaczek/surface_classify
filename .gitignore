@@ -137,12 +137,6 @@ dmypy.json
 *.zip
 !/src/localstructures/*.extxyz
 !/src/localstructures_onlyCu/*.extxyz
-!/src/localstructures_newopt/*.extxyz
-!/src/localstructures_newopt_onlyCu_altered/*.extxyz
-!src/localstructures_newopt_rh/*.extxyz
-!src/localstructures_newopt_pd/*.extxyz
-!src/localstructures_newopt_mcmd_rh/*.extxyz
-!src/localstructures_newopt_mcmd_pd/*.extxyz
 !localstructures_final_mc/*.extxyz
 !localstructures_final_mcmd_rh/*.extxyz
 !localstructures_final_mcmd_pd/*.extxyz
