@@ -168,7 +168,7 @@ def analyse_file(fpath, mode):
                 flatten=True
             )
 
-            struct_path = os.path.abspath("src/localstructures_newopt_rh")
+            struct_path = os.path.abspath("src/localstructures_final_mc")
             standard_classifier = sort_neigh.NeighbourClassifier(
                 local_structures_path=struct_path,
                 non_class_max=14
