@@ -135,6 +135,8 @@ dmypy.json
 *.extxyz
 *.POSCAR
 *.zip
+*.lammpstrj
+*.npy
 !/src/localstructures/*.extxyz
 !/src/localstructures_onlyCu/*.extxyz
 !localstructures_final_mc/*.extxyz
@@ -142,8 +144,6 @@ dmypy.json
 !localstructures_final_mcmd_pd/*.extxyz
 !test_data/230118_finalres_newlocalstruct_preclass/**
 !simulation_data/**
-*.lammpstrj
-*.npy
 
 #OOD items
 OOD/*
