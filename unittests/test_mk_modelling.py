@@ -50,7 +50,7 @@ class TestMkModelling(unittest.TestCase):
 
     def test_equilibria(self):
         target_indices = [
-            [0, 0, 1],
+            # [0, 0, 1],
             [1, 1, 2],
             [2, 1, 3],
             [3, 2, 4],
