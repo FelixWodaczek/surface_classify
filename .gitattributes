@@ -1,4 +1,9 @@
 src/localstructures/*.extxyz filter=lfs diff=lfs merge=lfs -text
+src/localstructures_onlyCu/* filter=lfs diff=lfs merge=lfs -text
 test_data/cunano_show.lammpstrj filter=lfs diff=lfs merge=lfs -text
 test_data/show_analysis.txt filter=lfs diff=lfs merge=lfs -text
-src/localstructures_onlyCu/* filter=lfs diff=lfs merge=lfs -text
+simulation_data/** filter=lfs diff=lfs merge=lfs -text
+src/localstructures_final_mc/*.extxyz filter=lfs diff=lfs merge=lfs -text
+src/localstructures_final_mcmd_pd/*.extxyz filter=lfs diff=lfs merge=lfs -text
+src/localstructures_final_mcmd_rh/*.extxyz filter=lfs diff=lfs merge=lfs -text
+test_data/230118_finalres_newlocalstruct_preclass/** filter=lfs diff=lfs merge=lfs -text
