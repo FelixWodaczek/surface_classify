@@ -7,6 +7,7 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+settings.json
 .Python
 build/
 develop-eggs/
@@ -142,7 +143,7 @@ dmypy.json
 !localstructures_final_mc/*.extxyz
 !localstructures_final_mcmd_rh/*.extxyz
 !localstructures_final_mcmd_pd/*.extxyz
-!test_data/230118_finalres_newlocalstruct_preclass/**
+!test_data/230118_finalres_newlocalstruct_preclass/*.txt
 !simulation_data/**
 
 #OOD items
