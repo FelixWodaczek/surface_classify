@@ -208,6 +208,36 @@ class NeighbourClassifier(BaseClassifier):
         else:
             raise ValueError("Mode %s is unknown. Currently available modes: \n'pre_group'\n'class_all'"%mode)
 
+    def get_soaps(self):
+        """Get all SOAP descriptors in a classifier dictionary.
+
+        Returns:
+            tuple (np.ndarray, list): SOAPs in dictionary, labels
+        """
+        soaps_from_classifier = []
+        labels = []
+
+        for key in self.identification_dict.keys():
+            entry = self.identification_dict[key]
+            if entry is not None:
+                soaps_from_classifier.append(entry["soap_descr"][:, 0, :])
+                labels.append(entry["id"])
+
+        buff = soaps_from_classifier[0].copy()
+        for ii_soap in range(1, len(soaps_from_classifier)):
+            buff = np.append(buff, soaps_from_classifier[ii_soap], axis=0)
+
+        soaps_from_classifier = buff.copy()
+        del buff
+
+        buff = []
+        for label in labels:
+            for entry in label:
+                buff.append(entry)
+
+        labels=buff
+        return soaps_from_classifier, labels
+
 
 class onlyCuClassifier(NeighbourClassifier):
     def __init__(self, local_structures_path=None, **kwargs):
