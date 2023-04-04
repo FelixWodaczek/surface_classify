@@ -26,6 +26,13 @@ STANDARD_LOCAL_STRUCTURES_PATH = os.path.join(os.path.dirname(os.path.dirname(__
 
 class BaseClassifier():
     def __init__(self, first_class=3, last_class=9, non_class_max=14, **kwargs):
+        """Base classifier, load generic classification parameters, define basic functions.
+
+        Args:
+            first_class (int, optional): Minimum number of neighbours to classify. Defaults to 3.
+            last_class (int, optional): Maximum number of neighbours to classify. Defaults to 9.
+            non_class_max (int, optional): Maximum number of neighbours to consider. Defaults to 14.
+        """
         self.class_low = first_class - 1
         self.class_high = last_class + 1
         self.low_list = [ii for ii in range(0, self.class_low + 1)]
@@ -33,13 +40,31 @@ class BaseClassifier():
         self.non_class_list = self.low_list + self.high_list
 
     def load_identifiers(self, **kwargs):
+        """Base function for loading identifiers into classification dict.
+        """
         pass
 
     def classify(self, **kwargs):
+        """Base classification function.
+        """
         pass
 
 class NeighbourClassifier(BaseClassifier):
     def __init__(self, local_structures_path=None, descr_species=["Rh", "Cu"], **kwargs):
+        """Classifier for determining the type of configuration according to values found in `self.identification_dict`.
+        `self.identification_dict` needs to be loaded from `local_structures_path` using `self.load_identifiers`, where local_structures path should have the following structure:
+        local_structures_path/
+            identifiers.json # names for each structure
+            a.extxyz # structure file a
+            b.extxyz # structure file b
+            c.extxyz # structure file c
+
+        see the /src/ folder in this repository for usable examples of such files.
+
+        Args:
+            local_structures_path (path, optional): Path of folder containing local structures for identification dictionary. Defaults to None.
+            descr_species (list, optional): Species to build soap descriptors for. Defaults to ["Rh", "Cu"].
+        """
         super().__init__(**kwargs)
 
         self.local_structures_path = None
@@ -59,22 +84,34 @@ class NeighbourClassifier(BaseClassifier):
             self.local_structures_path = local_structures_path
     
     def get_unsorted_cats(self):
+        """Get all names of categories, including ints for non-classified neighbour numbers.
+        """
         classes = []
         for ii_id in range(self.n_classes):
             cat_string = self.id_to_cat(ii_id)
             classes.append(cat_string)
         return classes
   
-    def id_to_cat(self, id_num):
-            if id_num < len(self.low_list):
-                return str(id_num)
-            elif id_num < len(self.non_class_list):
-                return str(id_num + (self.class_high - len(self.low_list)))
-            else:
-                return self.identification_list[id_num - len(self.non_class_list)]
+    def id_to_cat(self, id_num: int):
+        """Get the string name of a category for a classification integer.
+
+        Args:
+            id_num (int): integer ID to get category name for.
+
+        Returns:
+            string: Name of category for given ID int.
+        """
+        if id_num < len(self.low_list):
+            return str(id_num)
+        elif id_num < len(self.non_class_list):
+            return str(id_num + (self.class_high - len(self.low_list)))
+        else:
+            return self.identification_list[id_num - len(self.non_class_list)]
 
     @staticmethod
     def _target_locator(symbols, tar_symbol="Rh"):
+        """Helper function to find atom with target symbol in list of symbols.
+        """
         positions = []
         for ii_symb, symb in enumerate(symbols):
             if symb == tar_symbol:
@@ -82,7 +119,12 @@ class NeighbourClassifier(BaseClassifier):
         return positions
     
     @staticmethod
-    def _rescale_atom_to_target(atoms, rescale_target):
+    def _rescale_atom_to_target(atoms: Atoms, rescale_target: float) -> Atoms:
+        """Rescale atoms so that minimum distance in structure is equivalent to `rescale_target`.
+
+        Returns:
+            ase.Atoms: atoms with rescaled positions.
+        """
         if not isinstance(rescale_target, float):
             raise TypeError("rescale_target must be of type 'float'!")
 
@@ -100,7 +142,21 @@ class NeighbourClassifier(BaseClassifier):
 
         return in_atoms
 
-    def _soap_from_structfile(self, struct_file, ii_sf, rescale_target=None, **kwargs):
+    def _soap_from_structfile(self, struct_file, ii_sf, rescale_target:float=None, **kwargs):
+        """Helper function to build SOAP descriptors from file path.
+        `struct_file` has to be a path which contains a file readable using `ase.io.read`.
+
+        Args:
+            struct_file (path): file to read.
+            ii_sf (int): unused, only there to match general case of needing to know how many structure files are being read.
+            rescale_target (float, optional): If a float is given, rescales the local structure before generating SOAPs. Defaults to None.
+
+        Raises:
+            ImportError: Raised, if there is more than one "central" atom.
+
+        Returns:
+            np.ndarray of floats: SOAP descriptors for struct_file.
+        """
         struct_atoms = ase_read(struct_file)
 
         at_symbs = struct_atoms.get_chemical_symbols()
@@ -120,6 +176,18 @@ class NeighbourClassifier(BaseClassifier):
         return cur_soap
 
     def load_identifiers(self, rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, descr_func=None, **kwargs):
+        """Loader function to create `self.identification_dict`.
+        Goes through .extxyz files in directory and loads localstructures.
+        For SOAP parameters see dscribe.descriptors.SOAP, for kernel see dscribe.kernels.AverageKernel.
+
+        Args:
+            rcut (float, optional): SOAP parameter. Defaults to 3.1.
+            nmax (int, optional): SOAP parameter. Defaults to 12.
+            lmax (int, optional): SOAP parameter. Defaults to 12.
+            sigma (float, optional): SOAP parameter. Defaults to 0.5.
+            gamma_kernel (float, optional): kernel parameter. Defaults to 0.05.
+            descr_func (callable, optional): Non default atomic descriptor functions. Needs to have a .create function. Defaults to None.
+        """
         with open(os.path.join(self.local_structures_path, "identifiers.json"), "r") as f:
             json_dict = json.load(f)
             f.close()
@@ -162,33 +230,52 @@ class NeighbourClassifier(BaseClassifier):
         # self.kernel = rbf_kernel # TODO: replaces dscribe kernel, seems simpler
         self.kernel = ds_AverageKernel(metric="rbf", gamma=gamma_kernel)
 
-    def classify(self, atom, mode='pre_group', n_neigh_by_class=True, ensure_position=False, **kwargs):
+    def classify(self, atoms: Atoms, mode='pre_group', n_neigh_by_class=True, ensure_position=False, **kwargs):
+        """Classification function.
+        Find which local structure in `self.classification_dict` is most similar to given atoms and return ID of that structure.
+        Use `mode` to determine the way the classification works, available modes are:
+            pre_group: only compare structures that have the same amount of nearest neighbors as `atoms`.
+            class_all: compare to all local structures.
+
+        Args:
+            atoms (ase.Atoms): atoms to classify.
+            mode (str, optional): Mode to use for classification. Defaults to 'pre_group'.
+            n_neigh_by_class (bool, optional): Whether to get the number of neighbors from most similar class. If False, is taken from simply countin length of `atoms`.  Defaults to True.
+            ensure_position (bool, optional): Make sure first atom is actually Rh. Defaults to False.
+
+        Raises:
+            ImportError: If more than on Rh atom in `atoms`.
+            ValueError: If undefined mode is given.
+
+        Returns:
+            tuple of (int, int): (number of neighbors, class ID)
+        """
         if mode == 'pre_group' or 'class_all':
 
-            neighbour_len = len(atom) - 1
+            neighbour_len = len(atoms) - 1
             if neighbour_len <= self.class_low:
                 return neighbour_len, neighbour_len
             elif neighbour_len >= self.class_high:
                 return neighbour_len, neighbour_len - (self.class_high - len(self.low_list))
             else:
                 if ensure_position:
-                    at_symbs = atom.get_chemical_symbols()
+                    at_symbs = atoms.get_chemical_symbols()
                     at_pos = self._target_locator(at_symbs)
                     if not len(at_pos) == 1:
-                        print(atom)
+                        print(atoms)
                         print(at_pos)
-                        raise ImportError("More than one Rh Atom in atom")
+                        raise ImportError("More than one Rh Atom in atoms")
                 
                     else:
                         at_pos = at_pos[0]
                 else:
                     at_pos = 0
-            soap_atom = self.descr.create(atom, positions=[at_pos])[np.newaxis, ...]
+            soap_atoms = self.descr.create(atoms, positions=[at_pos])[np.newaxis, ...]
 
             if mode == 'pre_group':
                 soap_base = self.identification_dict[str(neighbour_len)]["soap_descr"]
-                assert soap_atom.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atom.shape[0], soap_base[0].shape[0])
-                similarities = self.kernel.create(soap_base, soap_atom)
+                assert soap_atoms.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atoms.shape[0], soap_base[0].shape[0])
+                similarities = self.kernel.create(soap_base, soap_atoms)
                 soap_class = np.argmax(similarities, axis=0)
 
                 return neighbour_len, self.identification_dict[str(neighbour_len)]["id_num"][int(soap_class)]
@@ -196,8 +283,8 @@ class NeighbourClassifier(BaseClassifier):
             elif mode == 'class_all':
                 soap_base = self.atomic_descriptors
 
-                assert soap_atom.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atom.shape[0], soap_base[0].shape[0])
-                similarities = self.kernel.create(soap_base, soap_atom)
+                assert soap_atoms.shape[0] == soap_base.shape[1],  "Shape mismatch in soap, %u %u"%(soap_atoms.shape[0], soap_base[0].shape[0])
+                similarities = self.kernel.create(soap_base, soap_atoms)
                 soap_class = np.argmax(similarities, axis=0)
                 class_id = soap_class[0] + len(self.non_class_list)
 
@@ -241,6 +328,9 @@ class NeighbourClassifier(BaseClassifier):
 
 class onlyCuClassifier(NeighbourClassifier):
     def __init__(self, local_structures_path=None, **kwargs):
+        """Alternate classifier for classifying sites on Cu only particle.
+        See sort_neigh.NeighbourClassifier for more documentation.
+        """
         super().__init__(**kwargs)
 
         if local_structures_path is None:
@@ -270,6 +360,9 @@ class onlyCuClassifier(NeighbourClassifier):
 
 class USMLClassifier(BaseClassifier):
     def __init__(self, **kwargs):
+        """Local structure classifier using unsupervised ML methods instead of local structure dictionary.
+        Employs atomic descriptors in `self.descr`, a dimensionality reduction in `self.dim_red` and a clustering method into `self.clusterer`.
+        """
         super().__init__(**kwargs)
 
         self.descr = None
@@ -282,6 +375,16 @@ class USMLClassifier(BaseClassifier):
         self.descr_species = []
         
     def _train_on_data(self, data, dim_red=None, clusterer=None):
+        """Train the dimensionality reduction on data.
+
+        Args:
+            data (np.ndarray): Training data for dimensionality reduction shaped (n_data x n_features).
+            dim_red (callable, optional): Function for dimensionality reduction. If None is given uses sklean.decomposition.PCA. Needs to have a .fit_transform method. Defaults to None.
+            clusterer (callable, optional): Clusterer. If None is given defaults to sklearn.cluster.KMeans. Needs to have a .fit_predict method. Defaults to None.
+
+        Returns:
+            np.ndarray of ints: cluster number for each entry in training data, shaped (n_data,).
+        """
         if dim_red is None:
             self.dim_red = PCA()
         else:
@@ -298,6 +401,22 @@ class USMLClassifier(BaseClassifier):
         return n_clust
 
     def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, descr_species=["Rh", "Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, descr_func=None, **kwargs):
+        """Train the classification on an ase.Atoms object using either SOAP or a function found in `dim_red`.
+
+        Args:
+            particle (ase.Atoms): Training particle.
+            dim_red (callable, optional): Function for dimensionality reduction. If None is given uses sklean.decomposition.PCA, needs to have a .fit_transform method. Defaults to None.
+            clusterer (callable, optional): Clusterer. If None is given defaults to sklearn.cluster.KMeans. Needs to have a .fit_predict method. Defaults to None.
+            descr_species (list, optional): SOAP parameter. Defaults to ["Rh", "Cu"].
+            rcut (float, optional): SOAP parameter. Defaults to 3.1.
+            nmax (int, optional): SOAP parameter. Defaults to 12.
+            lmax (int, optional): SOAP parameter. Defaults to 12.
+            sigma (float, optional): SOAP parameter. Defaults to 0.5.
+            descr_func (callable, optional): Atomic descriptor function to overwrite SOAP. If none is given, defaults to SOAP. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         self.descr_species = descr_species
         self.train_particle = particle.copy()
 
@@ -310,6 +429,15 @@ class USMLClassifier(BaseClassifier):
         return self._train_on_data(soaps, dim_red=dim_red, clusterer=clusterer)
     
     def save(self, file_name="USMLClassifier.pickle", overwrite=False):
+        """Saves ML Classifier to file via pickle.
+
+        Args:
+            file_name (str, optional): File name to save into. Defaults to "USMLClassifier.pickle".
+            overwrite (bool, optional): Whether or not to overwrite file if already exists. Defaults to False.
+
+        Raises:
+            FileExistsError: File exists already and overwrite flag is False.
+        """
         if not overwrite and os.path.isfile(file_name):
             raise FileExistsError("File %s already exists. To overwrite its contents set overwrite-flag to 'True'.")
             
@@ -322,6 +450,11 @@ class USMLClassifier(BaseClassifier):
     
     @classmethod
     def load_from_file(cls, file_name, **kwargs):
+        """Class constructor from save file created via `sort_neigh.USMLClassifier.save`.
+
+        Args:
+            file_name (str or path): File Location to load from.
+        """
         out_classifier = cls(**kwargs)
 
         with open(file_name, "rb") as f:
@@ -334,11 +467,22 @@ class USMLClassifier(BaseClassifier):
         return out_classifier
 
 
-    def classify(self, atom, ensure_position=False, index=None):
+    def classify(self, atoms: Atoms, ensure_position=False, index=None):
+        """Classification method to find cluster number of given atomic environment.
+        Builds atomic descriptor, applies dimensionality reduction and performs clustering to return cluster number.
+
+        Args:
+            atoms (Atoms): atoms to be classified.
+            ensure_position (bool, optional): Unused. Defaults to False.
+            index (int, optional): Index of "central" atom. Defaults to None.
+
+        Returns:
+            int: Number of cluster / Classification.
+        """
         if index is None:
-            soaps = self.descr.create(atom)
+            soaps = self.descr.create(atoms)
         else:
-            soaps = self.descr.create(atom)[index, :]
+            soaps = self.descr.create(atoms)[index, :]
         if len(soaps.shape) < 2:
             soaps = soaps[np.newaxis, :]
         reduced = self.dim_red.transform(soaps)
@@ -348,6 +492,11 @@ class USMLClassifier(BaseClassifier):
 
 class NeighbourSort():
     def __init__(self, classifier=None, **kwargs):
+        """Class to handle loading of trajectory and classifying each relevant atom in it.
+
+        Args:
+            classifier (sort_neigh.BaseClassifier, optional): Classifier to classify each site with. Defaults to None.
+        """
         if classifier is None:
             self.classifier = NeighbourClassifier(**kwargs)
         else:
@@ -362,6 +511,17 @@ class NeighbourSort():
         self.timesteps = None
 
     def load_particle(self, file_path, make_folders=False, timesteps=None, **kwargs):
+        """Load trajectory from file path.
+        `file_path` needs to be readable via ase.io.read.
+
+        Args:
+            file_path (str or path): Trajectory file, nees to be readable via ase.io.read.
+            make_folders (bool, optional): Whether or not a folder structure should be created to save each timestep in. Defaults to False.
+            timesteps (int, optional): Max number of timesteps to analyse. If None are given, does every available timestep in trajectory. Defaults to None.
+
+        Raises:
+            ValueError: If there are more timesteps in timesteps than in trajectory.
+        """
         if make_folders:
             self.init_folder_structure(file_path=file_path, timesteps=timesteps, **kwargs)
 
@@ -380,6 +540,28 @@ class NeighbourSort():
                 self.particle_trajectory[n_particle] = ase_sort(self.particle_trajectory[n_particle]) # So Rh is always in the last indices
 
     def init_folder_structure(self, file_path, n_head=9, n_tail=0, n_atoms_in_part=1400, timesteps=None, out_dir=None):
+        """Semi outdated function for handreading trajectory and creating folder structure.
+        Folder structure will be constructed as eg.:
+
+        neigh_sort_out/ # or out_dir if given
+            ts_0/
+                9/
+                10/
+                12/
+            ts_1/
+            ...
+            ts_ntimesteps/
+
+        where the ts_x/ directories contain the trajectory snapshot as well as subdirectories containing snapshots of the local environments depending on the number of neighbours.
+
+        Args:
+            file_path (str or path): target file
+            n_head (int, optional): Number of lines before each timestep. Defaults to 9.
+            n_tail (int, optional): Number of lines after each timestep. Defaults to 0.
+            n_atoms_in_part (int, optional): Number of atoms per timestep. Defaults to 1400.
+            timesteps (int, optional): Number of timesteps in trajectory. Defaults to None.
+            out_dir (str or path, optional): name of output trajectory. Defaults to None.
+        """
         if timesteps is None:
             n_lines = sum(1 for line in open(file_path, 'r'))
             timesteps = n_lines/(n_atoms_in_part+n_head+n_tail)
@@ -431,6 +613,15 @@ class NeighbourSort():
                 f.close()
 
     def sort_cat_counter(self, cat_counter=None):
+        """Sort a category counter according to the number of neighbours each category has.
+        To do this, the categories in classifier need to be named eg. 3_..., 4_... with the number of neighbours in front.
+
+        Args:
+            cat_counter (np.ndarray, optional): Category counter to sort, cat_counter.shape[-1] needs to be len(self.categories). If None is given, uses self.cat_counter. Defaults to None.
+
+        Returns:
+            tuple (list, np.ndarray): (sorted categories, sorted category counter)
+        """
         if cat_counter is None:
             cat_counter = self.cat_counter
 
@@ -454,6 +645,18 @@ class NeighbourSort():
         return sorted_classes, sorted_part_count
 
     def create_local_structure(self, cutoff_mult=0.9, last_n=14, **kwargs):
+        """Generate classification for each timestep in trajectory.
+
+        Args:
+            cutoff_mult (float, optional): Cutoff multiplier for neighbor list. Defaults to 0.9.
+            last_n (int, optional): Number of Special atoms to find, will be placed at botton of each timestep. Defaults to 14.
+
+        Raises:
+            ValueError: If there is no target particle found.
+
+        Returns:
+            np.ndarray of ints: Resulting categorisation shaped (n_timesteps, n_classes)
+        """
         if self.particle_trajectory is not None:
             self.cat_counter = np.zeros(shape=(self.timesteps, self.classifier.n_classes), dtype=np.int32)
 
@@ -491,6 +694,8 @@ class NeighbourSort():
 
 
     def _locstruct_from_folder(self, last_n=14, create_subfolders=True, cutoff_mult=0.9, **kwargs):
+        """Does the same as create_local_structure(), but needs to be used if folders had been created using init_folder_structure.
+        """
         self.cat_counter = np.zeros(shape=(self.timesteps, self.classifier.n_classes), dtype=np.int32)
         for step in self.progressbar(range(self.timesteps), "At Timestep:", size=40):
 
@@ -538,6 +743,20 @@ class NeighbourSort():
 
     @staticmethod
     def remove_n_surf(file_name, n_remove=64, out_file_name=None):
+        """Remove n random atoms from surface of nanoparticle.
+        Target file needs to be a single snapshot of trajectory, otherwise only first snapshot will be used.
+
+        Args:
+            file_name (str or path): Target file.
+            n_remove (int, optional): Number of surface atoms to remove. Defaults to 64.
+            out_file_name (str or path, optional): File name to save to. Defaults to None.
+
+        Raises:
+            ValueError: If target file has less atoms than n_remove.
+
+        Returns:
+            str: name of outgoing save file.
+        """
         file_name = os.path.abspath(file_name)
 
         if out_file_name is None:
@@ -588,6 +807,15 @@ class NeighbourSort():
         return out_file_name
         
     def sort_save_cat(self, file_name=None, cat_counter=None):
+        """Sort category count and save to .txt files.
+
+        Args:
+            file_name (str or path, optional): File name for saving categories into. Defaults to None.
+            cat_counter (np.ndarray, optional): Target category counter. If None is given, self.cat_counter is saved. Defaults to None.
+
+        Returns:
+            str: Name of saved file.
+        """
         if file_name is None:
             file_name = os.path.join(os.path.dirname(self.or_file_path), "part_count.txt")
 
@@ -608,6 +836,14 @@ class NeighbourSort():
 
     @staticmethod
     def load_sort_cat(file_name):
+        """Load category counter from saved file via sort_neigh.NeighbourSort.sort_save_cat.
+
+        Args:
+            file_name (str or path): Target file name.
+
+        Returns:
+            tuple (np.ndarray, np.ndarray, list): (category counter, timesteps, categories)
+        """
         with open(file_name, "r") as f:
             cat_line = f.read().split('\n')[1]
             cat_line = cat_line.split(' ')
@@ -670,6 +906,8 @@ class NeighbourSort():
 
     @staticmethod
     def plot_dist(sorted_classes, sorted_cat_counter, show_plot=True):
+        """Fast plotting function to get barchart of sorted categories and class list.
+        """
         x_plot = np.arange(sorted_cat_counter.shape[-1])
     
         sort_total_count = np.sum(sorted_cat_counter, axis=0)

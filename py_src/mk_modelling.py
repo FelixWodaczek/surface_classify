@@ -5,6 +5,13 @@ from scipy.constants import Boltzmann
 
 class MkModeller:
     def __init__(self):
+        """Class implementing differential equations for microkinetic modelling.
+
+        self.diffusion are the states
+        self.k is a placeholder for coefficients between states, k[i, 0] is backwards, k[i, 1] is forward
+        self.y_mask is for setting states to constants, if anything other than nan
+        self.y_inputs is the array of starting conditions.
+        """
         self.diffusion = np.zeros((9, ), dtype=np.float64)
         self.k = np.zeros((8, 2), dtype=np.float64)
 
@@ -43,7 +50,7 @@ class MkModeller:
 
         return self.diffusion
 
-    
+
     def constrained_soe(self, t, y):
         self.y_inputs[:] = np.where(self.mask_cond, self.y_mask, y)
         
