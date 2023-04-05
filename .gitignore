@@ -140,9 +140,9 @@ dmypy.json
 *.npy
 !/src/localstructures/*.extxyz
 !/src/localstructures_onlyCu/*.extxyz
-!localstructures_final_mc/*.extxyz
-!localstructures_final_mcmd_rh/*.extxyz
-!localstructures_final_mcmd_pd/*.extxyz
+!/src/localstructures_final_mc/*.extxyz
+!/src/localstructures_final_mcmd_rh/*.extxyz
+!/src/localstructures_final_mcmd_pd/*.extxyz
 !test_data/230118_finalres_newlocalstruct_preclass/*.txt
 !simulation_data/**
 
