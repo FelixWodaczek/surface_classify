@@ -11,7 +11,7 @@ A basic process for using some available functionalities is given below.
 import sort_neigh
 
 # Define a sorter
-sorter = sort_neigh.NeighbourSort(rcut=3.1, nmax=4, lmax=3, sigma=0.5, gamma_kernel=0.05)
+sorter = sort_neigh.NeighbourSort(r_cut=3.1, n_max=4, l_max=3, sigma=0.5, gamma_kernel=0.05)
 
 # Import a trajectory of a nanoparticle
 nano_path = "sometrajectory.lammpstrj"

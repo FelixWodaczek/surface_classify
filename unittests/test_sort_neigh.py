@@ -21,8 +21,8 @@ class TestSortNeigh(unittest.TestCase):
         self.particle_file = os.path.abspath(os.path.join(self.test_data, "cunano_show.lammpstrj"))
 
     def test_ase_classification(self):
-        dir_sorter = sn.NeighbourSort(rcut=3.1, nmax=4, lmax=3, sigma=0.5, gamma_kernel=0.05)
-        ram_sorter = sn.NeighbourSort(rcut=3.1, nmax=4, lmax=3, sigma=0.5, gamma_kernel=0.05)
+        dir_sorter = sn.NeighbourSort(r_cut=3.1, n_max=4, l_max=3, sigma=0.5, gamma_kernel=0.05)
+        ram_sorter = sn.NeighbourSort(r_cut=3.1, n_max=4, l_max=3, sigma=0.5, gamma_kernel=0.05)
 
         target_folder = os.path.join(os.path.dirname(__file__), "res")
 
@@ -51,7 +51,7 @@ class TestSortNeigh(unittest.TestCase):
         
         n_clusters = 9
         ml_classifier = sn.USMLClassifier()
-        train_clusters = ml_classifier.train_on_particle(full_particle, nmax=4, lmax=3, dim_red=PCA(n_components=2), clusterer=KMeans(n_clusters=n_clusters))
+        train_clusters = ml_classifier.train_on_particle(full_particle, n_max=4, l_max=3, dim_red=PCA(n_components=2), clusterer=KMeans(n_clusters=n_clusters))
         predict_clusters = ml_classifier.classify(full_particle)
         
         assert train_clusters.shape == predict_clusters.shape

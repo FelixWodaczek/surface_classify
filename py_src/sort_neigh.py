@@ -172,18 +172,18 @@ class NeighbourClassifier(BaseClassifier):
         else:
             at_pos = at_pos[0]
 
-        cur_soap = self.descr.create(struct_atoms, positions=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
+        cur_soap = self.descr.create(struct_atoms, centers=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
-    def load_identifiers(self, rcut=3.1, nmax=12, lmax=12, sigma=0.5, gamma_kernel=0.05, descr_func=None, **kwargs):
+    def load_identifiers(self, r_cut=3.1, n_max=12, l_max=12, sigma=0.5, gamma_kernel=0.05, descr_func=None, **kwargs):
         """Loader function to create `self.identification_dict`.
         Goes through .extxyz files in directory and loads localstructures.
         For SOAP parameters see dscribe.descriptors.SOAP, for kernel see dscribe.kernels.AverageKernel.
 
         Args:
-            rcut (float, optional): SOAP parameter. Defaults to 3.1.
-            nmax (int, optional): SOAP parameter. Defaults to 12.
-            lmax (int, optional): SOAP parameter. Defaults to 12.
+            r_cut (float, optional): SOAP parameter. Defaults to 3.1.
+            n_max (int, optional): SOAP parameter. Defaults to 12.
+            l_max (int, optional): SOAP parameter. Defaults to 12.
             sigma (float, optional): SOAP parameter. Defaults to 0.5.
             gamma_kernel (float, optional): kernel parameter. Defaults to 0.05.
             descr_func (callable, optional): Non default atomic descriptor functions. Needs to have a .create function. Defaults to None.
@@ -199,7 +199,7 @@ class NeighbourClassifier(BaseClassifier):
             self.identification_dict[str(ii_struct)] = {"soap_descr": [], "id_num": [], "id": []}
 
         if descr_func is None:
-            self.descr = SOAP(species=self.descr_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
+            self.descr = SOAP(species=self.descr_species, r_cut=r_cut, n_max=n_max, l_max=l_max, sigma=sigma, periodic=False)
         else:
             self.descr = descr_func
 
@@ -270,7 +270,7 @@ class NeighbourClassifier(BaseClassifier):
                         at_pos = at_pos[0]
                 else:
                     at_pos = 0
-            soap_atoms = self.descr.create(atoms, positions=[at_pos])[np.newaxis, ...]
+            soap_atoms = self.descr.create(atoms, centers=[at_pos])[np.newaxis, ...]
 
             if mode == 'pre_group':
                 soap_base = self.identification_dict[str(neighbour_len)]["soap_descr"]
@@ -354,7 +354,7 @@ class onlyCuClassifier(NeighbourClassifier):
         if rescale_target is not None:
             struct_atoms = self._rescale_atom_to_target(struct_atoms, rescale_target)
 
-        cur_soap = self.descr.create(struct_atoms, positions=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
+        cur_soap = self.descr.create(struct_atoms, centers=[at_pos]) # TODO: Implement a way to control how many SOAPs are used.
         return cur_soap
 
 
@@ -400,7 +400,7 @@ class USMLClassifier(BaseClassifier):
 
         return n_clust
 
-    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, descr_species=["Rh", "Cu"], rcut=3.1, nmax=12, lmax=12, sigma=0.5, descr_func=None, **kwargs):
+    def train_on_particle(self, particle: Atoms, dim_red=None, clusterer=None, descr_species=["Rh", "Cu"], r_cut=3.1, n_max=12, l_max=12, sigma=0.5, descr_func=None, **kwargs):
         """Train the classification on an ase.Atoms object using either SOAP or a function found in `dim_red`.
 
         Args:
@@ -408,9 +408,9 @@ class USMLClassifier(BaseClassifier):
             dim_red (callable, optional): Function for dimensionality reduction. If None is given uses sklean.decomposition.PCA, needs to have a .fit_transform method. Defaults to None.
             clusterer (callable, optional): Clusterer. If None is given defaults to sklearn.cluster.KMeans. Needs to have a .fit_predict method. Defaults to None.
             descr_species (list, optional): SOAP parameter. Defaults to ["Rh", "Cu"].
-            rcut (float, optional): SOAP parameter. Defaults to 3.1.
-            nmax (int, optional): SOAP parameter. Defaults to 12.
-            lmax (int, optional): SOAP parameter. Defaults to 12.
+            r_cut (float, optional): SOAP parameter. Defaults to 3.1.
+            n_max (int, optional): SOAP parameter. Defaults to 12.
+            l_max (int, optional): SOAP parameter. Defaults to 12.
             sigma (float, optional): SOAP parameter. Defaults to 0.5.
             descr_func (callable, optional): Atomic descriptor function to overwrite SOAP. If none is given, defaults to SOAP. Defaults to None.
 
@@ -421,7 +421,7 @@ class USMLClassifier(BaseClassifier):
         self.train_particle = particle.copy()
 
         if descr_func is None:
-            self.descr = SOAP(species=self.descr_species, rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
+            self.descr = SOAP(species=self.descr_species, r_cut=r_cut, n_max=n_max, l_max=l_max, sigma=sigma, periodic=False)
         else:
             self.descr = descr_func
         soaps = self.descr.create(particle)

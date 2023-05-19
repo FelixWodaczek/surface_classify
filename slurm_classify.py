@@ -31,7 +31,7 @@ class _PCA_quick:
         self.pca = pca
 
     def create(self, atom, positions):
-        descriptors = self.descr.create(atom, positions=positions)
+        descriptors = self.descr.create(atom, centers=positions)
         return self.pca.transform(descriptors)
 
 def analyse_file(fpath, mode):
@@ -51,15 +51,15 @@ def analyse_file(fpath, mode):
                 struct_path = os.path.abspath("src/localstructures_final_mcmd_rh")
 
         if mode == "soap_sort":
-            rcut=5.2 # 4.2 # 2.7 
-            nmax=4
-            lmax=3
+            r_cut=5.2 # 4.2 # 2.7 
+            n_max=4
+            l_max=3
             sigma=1.
             gamma_kernel=1.
 
             sorter = sort_neigh.NeighbourSort(
                 local_structures_path=struct_path,
-                rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, gamma_kernel=gamma_kernel
+                r_cut=r_cut, n_max=n_max, l_max=l_max, sigma=sigma, gamma_kernel=gamma_kernel
             )
             fname = os.path.basename(fpath).split('.')[0]
             save_txt_path = os.path.join(os.path.dirname(fpath), fname+"_soap_sorted_counts.txt")
@@ -112,13 +112,13 @@ def analyse_file(fpath, mode):
         neighbour_list = NeighborList(cut_off, bothways=True, self_interaction=False)
 
         if mode=="soap_gendescr":
-            rcut=5.2
-            nmax=4
-            lmax=3
+            r_cut=5.2
+            n_max=4
+            l_max=3
             sigma=1.
             gamma_kernel=1.
 
-            descr = SOAP(species=["Rh", "Cu"], rcut=rcut, nmax=nmax, lmax=lmax, sigma=sigma, periodic=False)
+            descr = SOAP(species=["Rh", "Cu"], r_cut=r_cut, n_max=n_max, l_max=l_max, sigma=sigma, periodic=False)
             n_descr = descr.get_number_of_features()
             fname = os.path.basename(fpath).split('.')[0]
             save_txt_path = os.path.join(os.path.dirname(fpath), fname+"_soap_%ux%u.txt"%(n_timesteps, n_rhod))
@@ -195,7 +195,7 @@ def analyse_file(fpath, mode):
                 neighbour_indices, dists = neighbour_list.get_neighbors(index)
                 neighbour_indices = np.append(np.array([index]), neighbour_indices, axis=0)
                 neighbour_particle = cur_particle[neighbour_indices]
-                descriptors[ii_ts%ts_buffersize, jj_rhod, :] = descr.create(neighbour_particle, positions=[0])
+                descriptors[ii_ts%ts_buffersize, jj_rhod, :] = descr.create(neighbour_particle, centers=[0])
             # Every ts_buffersize write to file
             if (ii_ts+1)%ts_buffersize == 0:
                 print("Writing at timestep %u"%ii_ts)

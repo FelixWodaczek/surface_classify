@@ -74,23 +74,23 @@ class SNParser:
         )
         self.parser.add_argument(
             "--r_cut",
-            dest="rcut", default=3.1, type=float,
-            help="rcut in SOAP. Defaults to 3.1."
+            dest="r_cut", default=3.1, type=float,
+            help="r_cut in SOAP. Defaults to 3.1."
         )
         self.parser.add_argument(
             "--n_max",
-            dest="nmax", default=12, type=int,
-            help="nmax in SOAP. Defaults to 12."
+            dest="n_max", default=12, type=int,
+            help="n_max in SOAP. Defaults to 12."
         )
         self.parser.add_argument(
             "--l_max",
-            dest="lmax", default=12, type=int,
-            help="lmax in SOAP. Defaults to 12."
+            dest="l_max", default=12, type=int,
+            help="l_max in SOAP. Defaults to 12."
         )
         self.parser.add_argument(
             "--sigma",
             dest="sigma", default=0.5, type=float,
-            help="lmax in SOAP. Defaults to 0.5."
+            help="l_max in SOAP. Defaults to 0.5."
         )
         self.parser.add_argument(
             "--gamma_kernel",
@@ -130,7 +130,7 @@ class SNParser:
     
     def init_neighbour_sort(self):
         self.neighbour_sort = sn.NeighbourSort(
-            rcut=self.pars_args.rcut, nmax=self.pars_args.nmax, lmax=self.pars_args.lmax,
+            r_cut=self.pars_args.r_cut, n_max=self.pars_args.n_max, l_max=self.pars_args.l_max,
             sigma=self.pars_args.sigma, gamma_kernel=self.pars_args.gamma_kernel
         )
 
