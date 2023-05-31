@@ -132,4 +132,6 @@ dependencies:
   - zeromq=4.3.4=he49afe7_1
   - zipp=3.15.0=pyhd8ed1ab_0
   - zstd=1.5.2=hbc0c0cd_6
+  - pip:
+      - energydiagram==0.2.0
 prefix: /Users/felixwodaczek/opt/anaconda3/envs/surface_classify
