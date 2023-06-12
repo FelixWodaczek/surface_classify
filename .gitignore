@@ -144,7 +144,10 @@ dmypy.json
 !/src/localstructures_final_mcmd_rh/*.extxyz
 !/src/localstructures_final_mcmd_pd/*.extxyz
 !test_data/230118_finalres_newlocalstruct_preclass/*.txt
+
+# Add simulation data files, but re-ignore DS_Store afterwards to stop it from being added with un-ignore-all command
 !simulation_data/**
+*.DS_Store
 
 #OOD items
 OOD/*
