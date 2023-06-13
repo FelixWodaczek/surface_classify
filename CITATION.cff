@@ -1,0 +1,16 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Wodaczek"
+  given-names: "Felix"
+  orcid: "https://orcid.org/0009-0000-1457-795X"
+- family-names: "Bunting"
+  given-names: "Rhys John"
+- family-names: "Cheng"
+  given-names: "Bingqing"
+  orcid: "https://orcid.org/0000-0002-3584-9632"
+title: "surface_classify"
+version: 1.0.0
+doi: 10.5281/zenodo.8033810
+date-released: 2023-06-13
+url: "https://github.com/FelixWodaczek/surface_classify"
