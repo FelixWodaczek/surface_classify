@@ -1,4 +1,6 @@
-# Readme
+[![DOI](https://zenodo.org/badge/623662099.svg)](https://doi.org/10.5281/zenodo.8033809)
+
+# Surface Classify
 
 Github repository for classifying the type of surface on CuRh nanoparticles.
 See `py_test` for an introductory jupyter script in `show_sort_neigh.ipynb`.
